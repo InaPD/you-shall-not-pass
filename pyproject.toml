@@ -1,0 +1,55 @@
+[project]
+name = "doorman"
+version = "0.1.0"
+description = "A recruiting agent with a layered prompt-injection defence and a red-team harness."
+requires-python = ">=3.12"
+dependencies = [
+    "anthropic>=0.40",
+    "pydantic>=2.8",
+    "pymupdf>=1.24",
+    "reportlab>=4.2",
+    "python-docx>=1.1",
+    "structlog>=24.4",
+    "typer>=0.12",
+    "pyyaml>=6.0",
+]
+
+[project.optional-dependencies]
+# Kept out of the base install so CI never downloads torch or the model weights.
+# Install with: uv sync --extra classifier   (needed from Phase 3 onward)
+classifier = [
+    "transformers>=4.44",
+    "torch>=2.4",
+]
+
+[project.scripts]
+doorman = "doorman.cli:app"
+
+[dependency-groups]
+dev = [
+    "pytest>=8.3",
+    "ruff>=0.6",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/doorman"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM", "W", "C4"]
+
+[tool.ruff.lint.per-file-ignores]
+# typer declares options as call-valued defaults; B008 is the wrong check here.
+"src/doorman/cli.py" = ["B008"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"

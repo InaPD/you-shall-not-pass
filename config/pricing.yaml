@@ -1,0 +1,9 @@
+# USD per million tokens, per model ID.
+# Ships with null placeholders: the harness computes cost_usd only when both
+# values are present for a model. Never hardcode prices in code (spec 6).
+claude-sonnet-5:
+  input: null
+  output: null
+claude-haiku-4-5-20251001:
+  input: null
+  output: null

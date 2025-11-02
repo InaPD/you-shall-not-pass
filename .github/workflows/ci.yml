@@ -1,0 +1,40 @@
+name: ci
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    env:
+      # No API key and no model weights in CI. Tests drive the agent loop with a
+      # FakeClient and the classifier with NullGuard (spec 19).
+      DOORMAN_NO_NETWORK: "1"
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - name: Set up Python
+        run: uv python install 3.12
+
+      - name: Install dependencies
+        # Base install only: the `classifier` extra pulls torch and is not needed here.
+        run: uv sync --frozen
+
+      - name: Lint
+        run: uv run ruff check .
+
+      - name: Test
+        run: uv run pytest
+
+      - name: Assert no API key is required
+        run: |
+          if [ -n "${ANTHROPIC_API_KEY:-}" ]; then
+            echo "CI must run without an API key"; exit 1
+          fi

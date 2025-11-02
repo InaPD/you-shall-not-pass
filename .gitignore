@@ -1,0 +1,16 @@
+# Runtime artefacts - never committed (spec 21.14)
+runs/
+harness/out/
+corpus/attacks/out/
+corpus/benign/out/
+
+# Secrets
+.env
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
