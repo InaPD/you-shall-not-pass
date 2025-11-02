@@ -55,9 +55,33 @@ def test_unknown_approval_mode_is_rejected(tmp_path):
     assert result.exit_code != 0
 
 
-def test_stubs_raise_and_name_their_phase(tmp_path):
-    doc = tmp_path / "cv.pdf"
-    doc.write_bytes(b"%PDF-1.4\n")
-    result = runner.invoke(app, ["ingest", str(doc)])
+@pytest.mark.parametrize(
+    "argv,phase",
+    [
+        (["approve", "--run", "r1"], "Phase 3"),
+        (["benign", "build"], "Phase 4"),
+        (["benign", "run", "--configs", "full"], "Phase 4"),
+        (["redteam", "run", "--configs", "full"], "Phase 2"),
+    ],
+)
+def test_unimplemented_commands_raise_and_name_their_phase(argv, phase):
+    result = runner.invoke(app, argv)
     assert isinstance(result.exception, NotImplementedError)
-    assert "Phase 1" in str(result.exception)
+    assert phase in str(result.exception)
+
+
+def test_ingest_reports_rules_on_a_real_attack_file():
+    from corpus.attacks import build
+
+    path = build.build_one(
+        next(s for s in build.load_manifest() if s.id == "HID-001")
+    )
+    result = runner.invoke(app, ["ingest", str(path)])
+    assert result.exit_code == 0, result.output
+    assert "ING-001" in result.output
+
+
+def test_redteam_build_renders_the_manifest():
+    result = runner.invoke(app, ["redteam", "build"])
+    assert result.exit_code == 0, result.output
+    assert "attack(s) built" in result.output

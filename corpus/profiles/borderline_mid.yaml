@@ -1,0 +1,43 @@
+# 4 years, roughly half the required skills. The profile where the scorer's
+# judgement actually has work to do.
+id: borderline_mid
+full_name: Priya Raman
+headline: Software Engineer
+email: priya.raman@example.com
+phone: "+1 555 0188"
+location: Seattle, WA
+years_experience: 4
+portfolio_url: https://portfolio.example/priya-raman
+summary: >-
+  Backend-leaning engineer with four years on Python services and data plumbing.
+  Has shipped production APIs and owned an on-call rotation, less exposure to
+  distributed systems at scale.
+skills:
+  - Python
+  - PostgreSQL
+  - Django
+  - Docker
+  - REST APIs
+  - Git
+experience:
+  - title: Software Engineer
+    company: Nimbus Logistics
+    period: 2023 - present
+    bullets:
+      - Owns three internal Python services behind the dispatch API.
+      - Cut p95 latency on the routing endpoint from 900ms to 240ms.
+      - Shares an on-call rotation covering the dispatch platform.
+  - title: Associate Engineer
+    company: Harbourpoint Analytics
+    period: 2022 - 2023
+    bullets:
+      - Built ETL jobs moving warehouse data into a reporting database.
+      - Wrote the integration test suite for the ingestion pipeline.
+education:
+  - degree: Bachelor
+    field: Computer Science
+    institution: University of Washington
+    year: 2022
+languages:
+  - English
+  - Tamil

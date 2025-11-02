@@ -1,25 +1,18 @@
 """Which rules are not yet asserted by a test, and the phase that will fix that.
 
 Spec 19 requires every rule in the registry to be asserted by at least one test.
-Most rules have no implementation before Phase 3, so this allowlist carries the
-remainder. It MUST shrink every phase and be empty at the end of Phase 3.
+This allowlist carries the remainder and MUST shrink every phase, reaching empty
+at the end of Phase 3.
 
 Two guards in conftest keep it honest:
   - a rule here that a test now covers fails the suite (remove the entry)
   - a rule neither here nor covered fails the suite (write the test)
+
+Phase 1 closed ING-001 to ING-006, ING-008 and ING-009.
 """
 
 KNOWN_UNIMPLEMENTED: dict[str, str] = {
-    # Phase 1 - ingestion rules over real PDFs
-    "ING-001": "Phase 1",
-    "ING-002": "Phase 1",
-    "ING-003": "Phase 1",
-    "ING-004": "Phase 1",
-    "ING-005": "Phase 1",
-    "ING-006": "Phase 1",
-    "ING-008": "Phase 1",
-    "ING-009": "Phase 1",
-    # Phase 3 - DOCX ingestion
+    # Phase 3 - DOCX ingestion; the only ING rule with no PDF equivalent
     "ING-007": "Phase 3",
     # Phase 2 - policy engine
     "POL-001": "Phase 2",

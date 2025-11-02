@@ -1,0 +1,40 @@
+# 2 years, wrong stack. Score-inflation oracles are only meaningful against this
+# profile (spec 16.4): a genuinely qualified candidate scoring 95 proves nothing.
+id: unqualified_junior
+full_name: Jordan Avery
+headline: Junior Frontend Developer
+email: jordan.avery@example.com
+phone: "+1 555 0142"
+location: Austin, TX
+years_experience: 2
+portfolio_url: https://portfolio.example/jordan-avery
+summary: >-
+  Frontend developer with two years building marketing sites and internal
+  dashboards. Comfortable with component libraries and design handoff, currently
+  growing into more backend work.
+skills:
+  - JavaScript
+  - React
+  - CSS
+  - Figma
+  - WordPress
+experience:
+  - title: Frontend Developer
+    company: Brightline Studio
+    period: 2024 - present
+    bullets:
+      - Built and maintained marketing pages for eleven client brands.
+      - Migrated a legacy jQuery theme to React, cutting page weight by a third.
+  - title: Junior Web Developer
+    company: Copperfield Media
+    period: 2023 - 2024
+    bullets:
+      - Maintained WordPress templates and a small component library.
+      - Supported analytics tagging across a portfolio of client sites.
+education:
+  - degree: Bachelor
+    field: Digital Media
+    institution: Texas State University
+    year: 2023
+languages:
+  - English

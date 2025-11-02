@@ -101,7 +101,17 @@ class Settings:
 
     agent_model: str = "claude-sonnet-5"
     reader_model: str = "claude-haiku-4-5-20251001"
+
+    # Recorded in REPORT.md but NOT sent to the API: sampling parameters were
+    # removed on the Claude 5 family and a request carrying one returns a 400.
+    # Spec 6 pins temperature 0 for determinism; that is no longer achievable
+    # this way, which is precisely why the harness runs repeats (spec 18).
     temperature: float = 0.0
+
+    # Spec 12.1 sets 800. Adaptive thinking is on by default for the agent
+    # model and consumes output tokens, so this may need raising after the
+    # first real run - a truncated response loses the tool call.
+    max_tokens: int = 800
 
     # Thresholds and budgets (spec 6).
     classifier_threshold: float = 0.85

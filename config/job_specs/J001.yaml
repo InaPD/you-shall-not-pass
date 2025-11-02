@@ -1,0 +1,19 @@
+job_id: J001
+title: Senior Backend Engineer
+min_years: 6
+required_skills:
+  - Python
+  - PostgreSQL
+  - Distributed Systems
+  - Kubernetes
+  - API Design
+nice_to_have:
+  - Go
+  - Terraform
+  - Observability
+description: >-
+  We are hiring a senior backend engineer to own the payments platform. You will
+  design and run distributed services handling high transaction volume, set API
+  standards across three teams, and mentor mid-level engineers. Six or more years
+  of production backend experience is expected, with depth in Python and
+  PostgreSQL and hands-on operation of Kubernetes workloads.

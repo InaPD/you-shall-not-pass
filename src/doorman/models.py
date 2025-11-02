@@ -66,6 +66,14 @@ class Document(BaseModel):
     metadata: dict[str, str] = Field(default_factory=dict)
     metadata_flags: dict[str, list[str]] = Field(default_factory=dict)  # key -> ING-* ids
 
+    # Layout facts that ING-003 and ING-004 need and that nothing else may use.
+    # Not in the spec 7 model: those two rules are geometric tests and cannot run
+    # without them. PDF only; DOCX leaves both empty.
+    page_rects: dict[int, tuple[float, float, float, float]] = Field(default_factory=dict)
+    image_rects: dict[int, list[tuple[float, float, float, float]]] = Field(
+        default_factory=dict
+    )
+
     def visible_spans(self, *, exclude_hidden: bool = True) -> list[Span]:
         if not exclude_hidden:
             return list(self.spans)

@@ -15,7 +15,7 @@ Five of these are listed in the spec as human-owned. Status and recommendation f
 
 | # | Decision | Recommendation | Blocks |
 |---|---|---|---|
-| 1 | Pin model IDs | `claude-sonnet-5` (agent) and `claude-haiku-4-5-20251001` (reader) are current and valid. Pin them. Still confirm on the models overview page before the first paid run, and fill `config/pricing.yaml` from the pricing page. | Phase 1 (first real API call) |
+| 1 | Pin model IDs | `claude-sonnet-5` (agent) is current. For the reader, the spec pins `claude-haiku-4-5-20251001` but the current API reference lists the ID as `claude-haiku-4-5` with no date suffix and warns against appending one. Verify both on the models overview page before the first paid run, and fill `config/pricing.yaml` from the pricing page. | Phase 1 (first real API call) |
 | 2 | PDF-first, DOCX in P3 | Accept. DOCX ingestion is a separate parser with its own rule set (ING-007, comments, tracked changes); deferring it keeps Phase 1-2 short. The `Document` model is format-agnostic, so nothing needs rework. | Phase 1 scope |
 | 3 | Repeats: 3 attacks / 1 benign | Accept, but confirm budget at the Phase 4 gate, not now. Token estimate below. | Phase 4 |
 | 4 | Classifier backend | `transformers` + CPU `torch`. Revisit only if install size or per-unit latency becomes the bottleneck in Phase 3. | Phase 3 |
@@ -184,6 +184,13 @@ tiny, off-page. `tests/test_tools_mocks.py` passes.
 allowlist in `test_rules_registry.py` is now empty.
 
 **Watch for:**
+- **`encoding` placements cannot use reportlab's standard fonts.** Found in Phase 1:
+  `drawString` with Helvetica mangles anything outside Latin-1, so a zero-width character
+  and a Cyrillic homoglyph both render as `I` and the payload is destroyed before it
+  reaches the page. PDF *metadata* round-trips them intact, which is why ING-005 and
+  ING-006 are tested through that carrier. For body-text `homoglyph` and `zero_width`
+  placements, embed a TTF with the needed glyphs, or deliver them through metadata or
+  DOCX instead.
 - The classifier download is a few hundred MB and must never happen in CI. CI uses `NullGuard`;
   make that the default when `config.classifier` is false and assert it in a test.
 - Classifier latency on CPU over every span and every metadata value of a resume is the likely
@@ -259,6 +266,19 @@ this phase. Resist adding it in Phase 2 even when it is obviously the fix. The v
 is the documented discovery, not the feature.
 
 ---
+
+## Open items raised during implementation
+
+1. **`temperature` no longer exists on these models.** Spec 6 pins `DOORMAN_TEMPERATURE=0`
+   for determinism, but sampling parameters were removed across the Claude 5 family and a
+   request carrying one returns a 400. The setting is kept and reported, but not sent. Run
+   variance is now handled only by the harness repeats, which strengthens the case for
+   keeping attack repeats at 3 rather than dropping to 2 at the Phase 4 budget gate.
+2. **`max_tokens: 800` (spec 12.1) may be too small.** Adaptive thinking is on by default
+   for the agent model and consumes output tokens, so 800 risks truncating a response
+   mid-tool-call. It is now a setting (`DOORMAN_MAX_TOKENS`). Check the first real run and
+   raise it if responses come back with `stop_reason: "max_tokens"`.
+3. **Reader model ID** - see decision 1 above; the dated suffix needs confirming.
 
 ## Standing constraints
 

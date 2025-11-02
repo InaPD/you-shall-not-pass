@@ -56,7 +56,20 @@ def ingest(
     file: Path = typer.Argument(..., exists=True, dir_okay=False, help="PDF or DOCX to parse."),
 ) -> None:
     """Print a Document summary plus any ING-* flags."""
-    _todo("ingest", "Phase 1")
+    from doorman.ingest import hidden, loader
+
+    settings = config.load_settings()
+    doc = loader.load(file, settings)
+    typer.echo(f"{doc.doc_id}  kind={doc.kind}  pages={doc.page_count}  sha256={doc.sha256[:16]}")
+    typer.echo(f"spans={len(doc.spans)}  hidden={len(doc.hidden_spans())}  "
+               f"metadata_keys={len(doc.metadata)}")
+    fired = hidden.fired_rules(doc)
+    typer.echo(f"rules fired: {', '.join(fired) if fired else '(none)'}")
+    for span in doc.hidden_spans():
+        preview = span.text.strip()[:60].replace("\n", " ")
+        typer.echo(f"  {span.id:<16} {','.join(span.hidden_reasons):<12} {preview!r}")
+    for key, reasons in doc.metadata_flags.items():
+        typer.echo(f"  {key:<28} {','.join(reasons)}")
 
 
 @app.command()
@@ -73,13 +86,35 @@ def run(
     ),
 ) -> None:
     """Screen one candidate end to end under a defence preset."""
-    _todo("run", "Phase 1 (single-call flow) and Phase 2 (phased flow)")
+    import anthropic
+
+    from doorman.agent import orchestrator
+
+    settings = config.load_settings()
+    cfg = config.preset(config_name)
+    client = anthropic.Anthropic()
+    result = orchestrator.run_candidate(
+        client, settings, cfg, doc_path=doc, candidate_id=candidate, job_id=job
+    )
+    typer.echo(
+        f"run {result.run_id}  status={result.status}  score={result.score}  "
+        f"decision={result.decision}  taint={result.taint}"
+    )
+    typer.echo(f"  rules fired : {', '.join(result.rules_fired) or '(none)'}")
+    typer.echo(f"  events      : {result.events_path}")
+    typer.echo(f"  outbox      : {result.outbox_path}")
+    typer.echo(f"  tokens      : in={result.input_tokens} out={result.output_tokens}")
 
 
 @redteam_app.command("build")
 def redteam_build() -> None:
     """Render the attack manifest to corpus/attacks/out/."""
-    _todo("redteam build", "Phase 1")
+    from corpus.attacks import build
+
+    built = build.build_all()
+    for spec, path in built:
+        typer.echo(f"{spec.id:<9} {spec.family:<12} {spec.placement:<15} {path}")
+    typer.echo(f"{len(built)} attack(s) built")
 
 
 @redteam_app.command("run")
