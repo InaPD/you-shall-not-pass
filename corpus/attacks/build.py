@@ -23,6 +23,10 @@ PROFILE_DIR = CORPUS_ROOT / "profiles"
 GENERATORS = {
     "direct": "corpus.attacks.generators.direct",
     "hidden_text": "corpus.attacks.generators.hidden_text",
+    "metadata": "corpus.attacks.generators.metadata",
+    # Intent-defined families (spec 16.2): they reuse another family's placement
+    # and are grouped by the payload's goal, which is what the report reports on.
+    "exfiltration": "corpus.attacks.generators.exfiltration",
 }
 
 # Spec 16.4: a score-inflation oracle against an already-qualified profile proves

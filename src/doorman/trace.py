@@ -105,6 +105,26 @@ def _drop_below_info(_logger: Any, _name: str, event_dict: dict[str, Any]) -> di
     return event_dict
 
 
+class _StderrLogger:
+    """Writes to whatever `sys.stderr` is *now*.
+
+    structlog's PrintLoggerFactory binds the stream when the logger is built,
+    and with cache_logger_on_first_use that handle outlives its owner: under
+    pytest, stderr is a per-test capture buffer, so the cached logger ends up
+    writing to a closed file and raises. Resolving it per call costs nothing and
+    removes the whole class of problem.
+    """
+
+    def msg(self, message: str) -> None:
+        print(message, file=sys.stderr)
+
+    log = debug = info = warning = warn = error = critical = exception = failure = msg
+
+
+def _stderr_logger_factory(*_args: Any) -> _StderrLogger:
+    return _StderrLogger()
+
+
 def configure_logging() -> None:
     """Idempotent. Safe to call from the CLI, the harness and tests."""
     global _configured
@@ -119,7 +139,7 @@ def configure_logging() -> None:
             _drop_below_info,
             structlog.processors.JSONRenderer(),
         ],
-        logger_factory=structlog.PrintLoggerFactory(file=sys.stderr),
+        logger_factory=_stderr_logger_factory,
         wrapper_class=structlog.make_filtering_bound_logger(logging.DEBUG),
         cache_logger_on_first_use=True,
     )
@@ -333,8 +353,17 @@ def tool_executed(ctx: RunContext, *, tool: str, effect: dict[str, Any]) -> None
     _emit(ctx, "tool_executed", tool=tool, effect=effect)
 
 
-def review_requested(ctx: RunContext, *, cause_rule_id: str) -> None:
-    _emit(ctx, "review_requested", cause_rule_id=cause_rule_id)
+def review_requested(
+    ctx: RunContext, *, cause_rule_id: str | None = None, reason: str | None = None
+) -> None:
+    """`cause_rule_id` only when a rule actually caused it (the taint gate).
+
+    A reader that failed to validate, or a phase that ran out of turns, is not a
+    policy denial and must not borrow a POL-* id for one: the "rules fired"
+    column in the report would then attribute mechanical failures to the policy
+    layer and overstate what it caught.
+    """
+    _emit(ctx, "review_requested", cause_rule_id=cause_rule_id, reason=reason)
 
 
 def run_finished(

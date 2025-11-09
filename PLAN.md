@@ -279,6 +279,16 @@ is the documented discovery, not the feature.
    mid-tool-call. It is now a setting (`DOORMAN_MAX_TOKENS`). Check the first real run and
    raise it if responses come back with `stop_reason: "max_tokens"`.
 3. **Reader model ID** - see decision 1 above; the dated suffix needs confirming.
+4. **REPORT.md must not be committed until it is built from real inference.** The Phase 2
+   gate was verified with a scripted worst-case model (`CompliantClient` in `tests/fakes.py`)
+   that accepts every injection. That proves the pipeline and isolates what the defences
+   stop from what the model declines, but the ASR numbers it produces are a property of the
+   fake, not a measurement. Only commit a REPORT.md generated from a real run.
+5. **A review is not always caused by a rule.** `trace.review_requested` now takes an
+   optional `cause_rule_id` plus a free-text `reason`. Phase 2 initially borrowed POL-001
+   for reader failures and phases that ran out of turns, which would have credited the
+   policy layer for mechanical failures in the "rules fired" table and overstated what it
+   caught. Only the taint gate passes a real rule id (POL-002).
 
 ## Standing constraints
 

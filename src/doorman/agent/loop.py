@@ -15,6 +15,7 @@ from typing import Any
 from doorman import trace
 from doorman.agent import tools as tool_defs
 from doorman.config import DefenseConfig, Settings
+from doorman.guard import envelope
 from doorman.models import Allow, PolicyDecision, RunContext, ToolCall
 from doorman.tools import web
 from doorman.tools.ats import ATS, NOTE_TEMPLATES
@@ -42,6 +43,13 @@ class Router:
     decision: str | None = None
     email_sent: bool = False
     ats_written: bool = False
+    review_requested: bool = False
+    rationale: str = ""
+    # Set when an irreversible action is queued rather than executed. Always
+    # False until the approval queue lands in Phase 3; the phase-completion
+    # checks read them now so that queueing counts as finishing the phase.
+    email_pending: bool = False
+    ats_pending: bool = False
     executed: list[str] = field(default_factory=list)
 
     def dispatch(self, call: ToolCall, decision: PolicyDecision) -> str:
@@ -65,6 +73,7 @@ class Router:
     def _tool_score_candidate(self, args: dict) -> tuple[dict, dict]:
         score = int(args.get("score", 0))
         self.score = score
+        self.rationale = str(args.get("rationale", ""))
         self.ats.record_score(
             run_id=self.ctx.run_id,
             candidate_id=self.ctx.candidate_id,
@@ -76,6 +85,7 @@ class Router:
     def _tool_propose_decision(self, args: dict) -> tuple[dict, dict]:
         status = str(args.get("status", ""))
         self.decision = status
+        self.rationale = str(args.get("rationale", ""))
         self.ats.record_decision(
             run_id=self.ctx.run_id,
             candidate_id=self.ctx.candidate_id,
@@ -122,13 +132,24 @@ class Router:
     def _tool_ats_lookup(self, args: dict) -> tuple[dict, dict]:
         target = str(args.get("candidate_id") or self.ctx.candidate_id)
         record = self.ats.get(target)
-        # `notes` is untrusted and is returned as-is here. Phases 2 and 3 run the
-        # classifier over it and wrap it in an envelope before the agent sees it.
-        return record.model_dump(), {"looked_up": target}
+        payload = record.model_dump()
+        # `notes` is free text of unknown provenance (spec 7). The trusted fields
+        # pass through; the note is enveloped so the agent can see where the
+        # trustworthy part of this result stops.
+        if self.cfg.isolate_reader and payload.get("notes"):
+            payload["notes"] = envelope.wrap("ats_notes", str(payload["notes"]))
+        return payload, {"looked_up": target}
+
+    def _tool_request_human_review(self, args: dict) -> tuple[dict, dict]:
+        self.review_requested = True
+        return {"ok": True, "queued": True}, {"review": True}
 
     def _tool_fetch_url(self, args: dict) -> tuple[dict, dict]:
-        result = web.fetch(str(args.get("url", "")))
-        return result, {"fetched": str(args.get("url", "")), "resolved": "text" in result}
+        url = str(args.get("url", ""))
+        result = web.fetch(url)
+        if self.cfg.isolate_reader and "text" in result:
+            result = {**result, "text": envelope.wrap("portfolio_page", result["text"])}
+        return result, {"fetched": url, "resolved": "text" in result}
 
     _tool_fetch_portfolio = _tool_fetch_url
 

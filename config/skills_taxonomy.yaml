@@ -1,0 +1,41 @@
+# Canonical skill names and their accepted aliases (spec 9).
+#
+# Normalisation is a defence as well as a tidiness measure: a skill list is free
+# text from an untrusted document, and mapping it onto a closed vocabulary means
+# an attacker cannot smuggle a sentence through the `skills` field. Anything not
+# listed here is dropped, and the drop count is logged.
+canonical:
+  Python: [python3, py, python 3, cpython]
+  JavaScript: [js, ecmascript, javascript/typescript]
+  TypeScript: [ts]
+  Go: [golang]
+  Java: []
+  Ruby: [ruby on rails, rails]
+  PostgreSQL: [postgres, psql, postgresql database]
+  MySQL: [mariadb]
+  SQL: [ansi sql]
+  Django: [django rest framework, drf]
+  Flask: []
+  FastAPI: []
+  React: [react.js, reactjs]
+  Node.js: [node, nodejs]
+  Kubernetes: [k8s, kubernetes administration]
+  Docker: [containers, containerisation, containerization]
+  Terraform: [hcl]
+  AWS: [amazon web services]
+  GCP: [google cloud, google cloud platform]
+  Azure: [microsoft azure]
+  CI/CD: [continuous integration, continuous delivery, jenkins, github actions]
+  Distributed Systems: [distributed computing, microservices]
+  API Design: [rest apis, rest api, restful apis, api development, graphql]
+  Observability: [monitoring, prometheus, grafana, opentelemetry]
+  Security: [appsec, application security, infosec]
+  Machine Learning: [ml, deep learning]
+  Data Engineering: [etl, elt, data pipelines]
+  Git: [version control, github, gitlab]
+  Linux: [unix]
+  CSS: [css3, scss, sass]
+  HTML: [html5]
+  Figma: [design handoff]
+  WordPress: []
+  Testing: [pytest, unit testing, tdd, integration testing]

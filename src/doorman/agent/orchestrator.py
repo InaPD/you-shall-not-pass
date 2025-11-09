@@ -21,10 +21,22 @@ import yaml
 from doorman import trace
 from doorman.agent import prompts
 from doorman.agent.loop import Router, run_phase
-from doorman.agent.tools import NAIVE_TOOLS
+from doorman.agent.tools import NAIVE_TOOLS, tools_for
 from doorman.config import CONFIG_DIR, DefenseConfig, Settings, run_dir
 from doorman.ingest import hidden, loader
-from doorman.models import Document, JobSpec, Phase, RunContext, Taint
+from doorman.models import (
+    ATSRecord,
+    CandidateProfile,
+    Document,
+    JobSpec,
+    Phase,
+    RunContext,
+    Taint,
+)
+from doorman.policy import engine
+from doorman.policy import phases as phase_defs
+from doorman.reader import quarantined
+from doorman.reader.quarantined import ReaderFailed
 from doorman.tools.ats import ATS
 from doorman.tools.email import Outbox
 
@@ -47,6 +59,8 @@ class RunResult:
     output_tokens: int = 0
     duration_s: float = 0.0
     doc_sha256: str = ""
+    canary: str = ""          # needed by the canary_leaked oracle
+    trusted_email: str = ""   # needed by the email_recipient_not_ats oracle
     events_path: Path | None = None
     outbox_path: Path | None = None
     ats_path: Path | None = None
@@ -186,10 +200,13 @@ def run_candidate(
         router = Router(ctx=ctx, cfg=cfg, settings=settings, ats=ats, outbox=outbox)
 
         if cfg.phase_allowlists:
-            raise NotImplementedError("the phased flow lands in Phase 2; see PLAN.md")
-        phase_result = _single_call(
-            client, settings, cfg, ctx, doc=doc, job=job, router=router
-        )
+            phase_result = _phased(
+                client, settings, cfg, ctx, doc=doc, job=job, record=record, router=router
+            )
+        else:
+            phase_result = _single_call(
+                client, settings, cfg, ctx, doc=doc, job=job, router=router
+            )
 
         duration = time.perf_counter() - started
         trace.run_finished(
@@ -214,9 +231,196 @@ def run_candidate(
             output_tokens=phase_result.output_tokens,
             duration_s=round(duration, 3),
             doc_sha256=doc.sha256,
+            canary=ctx.canary,
+            trusted_email=ctx.trusted_email,
             events_path=events_path,
             outbox_path=outbox.path,
             ats_path=ats.path,
         )
     finally:
         trace.close_run(run_id)
+
+# --- Phased flow (spec 12.3) -------------------------------------------------
+
+
+def _allowed_hosts(profile: CandidateProfile) -> set[str]:
+    from urllib.parse import urlparse
+
+    if not profile.portfolio_url:
+        return set()
+    parsed = urlparse(profile.portfolio_url)
+    if parsed.scheme not in ("http", "https") or not parsed.hostname:
+        return set()
+    return {parsed.hostname}
+
+
+def _trust_portfolio_url(ctx: RunContext, profile: CandidateProfile,
+                         cfg: DefenseConfig) -> None:
+    """Spec 9: the portfolio host is trusted only when it parses and is allowed."""
+    hosts = _allowed_hosts(profile)
+    if not hosts:
+        return
+    ctx.trusted_portfolio_url = profile.portfolio_url
+    if cfg.output_scan:
+        ctx.trusted_urls |= hosts
+
+
+def _run_one_phase(
+    client: Any,
+    settings: Settings,
+    cfg: DefenseConfig,
+    ctx: RunContext,
+    router: Router,
+    *,
+    phase: Phase,
+    system: str,
+    task: str,
+    is_complete: Any,
+) -> Any:
+    """Each phase gets a fresh message list. Phases never share history; typed
+    outputs are passed forward in the next phase's prompt (spec 12.3)."""
+    ctx.phase = phase
+    return run_phase(
+        client,
+        settings,
+        cfg,
+        ctx,
+        system=system,
+        messages=[{"role": "user", "content": task}],
+        tools=tools_for(cfg.hardened_tools, phase_defs.allowed(phase)),
+        router=router,
+        max_turns=settings.max_turns_per_phase,
+        evaluate=engine.evaluate,
+        is_complete=is_complete,
+    )
+
+
+def _review(
+    ctx: RunContext,
+    router: Router,
+    *,
+    cause_rule_id: str | None = None,
+    reason: str | None = None,
+) -> None:
+    """Code calls the review tool directly; the model is not consulted."""
+    ctx.phase = Phase.REVIEW
+    trace.review_requested(ctx, cause_rule_id=cause_rule_id, reason=reason)
+    router.review_requested = True
+
+
+def _phased(
+    client: Any,
+    settings: Settings,
+    cfg: DefenseConfig,
+    ctx: RunContext,
+    *,
+    doc: Document,
+    job: JobSpec,
+    record: ATSRecord,
+    router: Router,
+) -> Any:
+    totals = PhaseTotals()
+
+    # --- extract -------------------------------------------------------------
+    ctx.phase = Phase.EXTRACT
+    try:
+        profile, used_in, used_out = quarantined.read_profile(
+            client, settings, cfg, ctx, doc
+        )
+    except ReaderFailed:
+        _review(ctx, router, reason="reader_failed")
+        return PhaseResultLike("review", totals)
+    totals.add(used_in, used_out)
+    _trust_portfolio_url(ctx, profile, cfg)
+
+    # --- score ---------------------------------------------------------------
+    result = _run_one_phase(
+        client, settings, cfg, ctx, router,
+        phase=Phase.SCORE,
+        system=prompts.score_system(
+            job=job, profile=profile, canary=ctx.canary, polite=cfg.polite_prompt
+        ),
+        task=prompts.PHASE_TASKS["score"],
+        is_complete=lambda r: r.score is not None,
+    )
+    totals.add(result.input_tokens, result.output_tokens)
+    if router.score is None:
+        _review(ctx, router, reason="no_score_recorded")
+        return PhaseResultLike("review", totals)
+    score_rationale = router.rationale
+
+    # --- decide --------------------------------------------------------------
+    result = _run_one_phase(
+        client, settings, cfg, ctx, router,
+        phase=Phase.DECIDE,
+        system=prompts.decide_system(
+            job=job, profile=profile, score=router.score, rationale=score_rationale,
+            canary=ctx.canary, polite=cfg.polite_prompt,
+        ),
+        task=prompts.PHASE_TASKS["decide"],
+        is_complete=lambda r: r.decision is not None,
+    )
+    totals.add(result.input_tokens, result.output_tokens)
+    if router.decision is None:
+        _review(ctx, router, reason="no_decision_recorded")
+        return PhaseResultLike("review", totals)
+
+    # --- taint gate ----------------------------------------------------------
+    # Spec 11.2: a suspicious document still gets scored and decided, so the
+    # recruiter receives a recommendation - it just never reaches the outside
+    # world on its own. POL-002 would also deny these tools; the redundancy is
+    # deliberate and both halves must stay.
+    if ctx.taint is Taint.SUSPICIOUS:
+        _review(ctx, router, cause_rule_id="POL-002")  # the taint gate is a real rule
+        return PhaseResultLike("review", totals)
+
+    # --- communicate ---------------------------------------------------------
+    result = _run_one_phase(
+        client, settings, cfg, ctx, router,
+        phase=Phase.COMMUNICATE,
+        system=prompts.communicate_system(
+            full_name=record.full_name, status=router.decision,
+            rationale=router.rationale, canary=ctx.canary, polite=cfg.polite_prompt,
+        ),
+        task=prompts.PHASE_TASKS["communicate"],
+        is_complete=lambda r: r.email_sent or r.email_pending,
+    )
+    totals.add(result.input_tokens, result.output_tokens)
+
+    # --- write_ats -----------------------------------------------------------
+    result = _run_one_phase(
+        client, settings, cfg, ctx, router,
+        phase=Phase.WRITE_ATS,
+        system=prompts.write_ats_system(
+            status=router.decision, rationale=router.rationale,
+            canary=ctx.canary, polite=cfg.polite_prompt,
+        ),
+        task=prompts.PHASE_TASKS["write_ats"],
+        is_complete=lambda r: r.ats_written or r.ats_pending,
+    )
+    totals.add(result.input_tokens, result.output_tokens)
+    return PhaseResultLike("done", totals)
+
+
+@dataclass
+class PhaseTotals:
+    input_tokens: int = 0
+    output_tokens: int = 0
+
+    def add(self, used_in: int, used_out: int) -> None:
+        self.input_tokens += used_in
+        self.output_tokens += used_out
+
+
+@dataclass
+class PhaseResultLike:
+    status: str
+    totals: PhaseTotals
+
+    @property
+    def input_tokens(self) -> int:
+        return self.totals.input_tokens
+
+    @property
+    def output_tokens(self) -> int:
+        return self.totals.output_tokens

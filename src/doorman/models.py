@@ -239,6 +239,10 @@ class RunContext(BaseModel):
     canary: str  # random 16-hex per run, embedded in the agent system prompt
     trusted_email: str  # copied from ATSRecord
     trusted_full_name: str  # copied from ATSRecord
-    trusted_urls: set[str] = Field(default_factory=set)
+    trusted_urls: set[str] = Field(default_factory=set)  # hostnames, for OUT-002
+    # The exact URL `fetch_portfolio` is permitted to request (POL-004). Separate
+    # from `trusted_urls`, which holds hostnames for the output scanner: POL-004
+    # is an equality check on one value, OUT-002 is a host membership test.
+    trusted_portfolio_url: str | None = None
     budgets_used: dict[str, int] = Field(default_factory=dict)
     batch_candidate_ids: set[str] = Field(default_factory=set)  # for OUT-004

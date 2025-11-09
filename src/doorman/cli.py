@@ -129,7 +129,14 @@ def redteam_run(
     only: str = typer.Option("", "--only", help="Attack ids or a family name to restrict to."),
 ) -> None:
     """Run the attack matrix."""
-    _todo("redteam run", "Phase 2")
+    from harness import run_matrix
+
+    names = [n.strip() for n in configs.split(",") if n.strip()]
+    only_ids = [n.strip() for n in only.split(",") if n.strip()] or None
+    path = run_matrix.run(
+        configs=names, repeats=repeats, only=only_ids, approval=approval
+    )
+    typer.echo(f"results appended to {path}")
 
 
 @benign_app.command("build")
@@ -159,7 +166,11 @@ def approve(
 @app.command()
 def report() -> None:
     """Turn results.jsonl into REPORT.md and summary.json."""
-    _todo("report", "Phase 2 (minimal) and Phase 4 (full)")
+    from harness import report as report_builder
+
+    path = report_builder.build()
+    typer.echo(f"wrote {path}")
+    typer.echo(f"wrote {report_builder.SUMMARY_PATH}")
 
 
 @app.command()

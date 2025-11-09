@@ -9,22 +9,13 @@ Two guards in conftest keep it honest:
   - a rule neither here nor covered fails the suite (write the test)
 
 Phase 1 closed ING-001 to ING-006, ING-008 and ING-009.
+Phase 2 closed every POL-* rule and both APR-* rules.
 """
 
 KNOWN_UNIMPLEMENTED: dict[str, str] = {
     # Phase 3 - DOCX ingestion; the only ING rule with no PDF equivalent
     "ING-007": "Phase 3",
-    # Phase 2 - policy engine
-    "POL-001": "Phase 2",
-    "POL-002": "Phase 2",
-    "POL-003": "Phase 2",
-    "POL-004": "Phase 2",
-    "POL-005": "Phase 2",
-    "POL-006": "Phase 2",
-    "POL-007": "Phase 2",
-    "POL-010": "Phase 2",
-    "POL-011": "Phase 2",
-    # Phase 3 - classifier, heuristics, output scan, approvals
+    # Phase 3 - classifier, heuristics and output scan
     "CLS-001": "Phase 3",
     "CLS-002": "Phase 3",
     "CLS-003": "Phase 3",
@@ -35,6 +26,4 @@ KNOWN_UNIMPLEMENTED: dict[str, str] = {
     "OUT-003": "Phase 3",
     "OUT-004": "Phase 3",
     "OUT-005": "Phase 3",
-    "APR-001": "Phase 3",
-    "APR-002": "Phase 3",
 }

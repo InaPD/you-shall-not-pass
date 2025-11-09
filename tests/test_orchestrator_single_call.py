@@ -237,8 +237,3 @@ class TestTraceOutput:
         saved = (tmp_path / result.run_id / "documents" / "DIR-001.json")
         assert saved.is_file()
 
-
-class TestPhasedFlowNotYetBuilt:
-    def test_a_phased_preset_fails_loudly(self, tmp_path, attack_files):
-        with pytest.raises(NotImplementedError, match="Phase 2"):
-            run(full_flow(), tmp_path, attack_files["DIR-001"], preset="full")
