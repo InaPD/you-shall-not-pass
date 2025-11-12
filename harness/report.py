@@ -84,9 +84,13 @@ def rules_table(rows: list[dict], configs: list[str]) -> tuple[list[str], dict]:
     counts: dict[str, Counter] = {config: Counter() for config in configs}
     for row in rows:
         counts[row["config"]].update(row.get("rules_fired") or [])
-    every_rule = sorted({rule for counter in counts.values() for rule in counter})
-    if not every_rule:
-        return ["_No rules fired in any run._"], {}
+    from doorman.policy import rules as rule_registry
+
+    # Every rule, not just the ones that fired: a rule that never fires across
+    # the whole corpus is itself a result worth showing.
+    every_rule = sorted(rule_registry.RULES)
+    if not rows:
+        return ["_No runs recorded._"], {}
     lines = [
         "| rule | " + " | ".join(configs) + " |",
         "|---" * (len(configs) + 1) + "|",

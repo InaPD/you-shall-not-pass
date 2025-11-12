@@ -24,6 +24,11 @@ GENERATORS = {
     "direct": "corpus.attacks.generators.direct",
     "hidden_text": "corpus.attacks.generators.hidden_text",
     "metadata": "corpus.attacks.generators.metadata",
+    "encoding": "corpus.attacks.generators.encoding",
+    "forged_structure": "corpus.attacks.generators.forged_structure",
+    "tool_result": "corpus.attacks.generators.tool_result",
+    "split": "corpus.attacks.generators.split",
+    "docx": "corpus.attacks.generators.docx_placements",
     # Intent-defined families (spec 16.2): they reuse another family's placement
     # and are grouped by the payload's goal, which is what the report reports on.
     "exfiltration": "corpus.attacks.generators.exfiltration",
@@ -49,6 +54,15 @@ class AttackSpec:
     oracle: str
     oracle_args: dict[str, Any]
     notes: str = ""
+
+    @property
+    def intent(self) -> str:
+        """`score_floor.a` and `score_floor.b` are two phrasings of one intent."""
+        return self.payload.rsplit(".", 1)[0]
+
+    @property
+    def is_docx(self) -> bool:
+        return self.family == "docx" or self.placement in ("homoglyph", "zero_width")
 
     @property
     def payload_path(self) -> Path:
@@ -94,12 +108,71 @@ def validate(specs: list[AttackSpec]) -> None:
             )
 
 
+# Corpus-level selection rules (spec 16.3). Checked separately from per-entry
+# validation: these are properties of the whole manifest, not of one attack.
+MIN_PER_FAMILY = 5
+MIN_PLACEMENTS_PER_INTENT = 3
+MIN_DOCX = 10
+MIN_TOOL_RESULT = 8
+
+
+def selection_violations(specs: list[AttackSpec]) -> list[str]:
+    """Every way the corpus falls short of spec 16.3. Empty means compliant."""
+    from collections import defaultdict
+
+    problems: list[str] = []
+
+    per_family: dict[str, int] = defaultdict(int)
+    per_intent: dict[str, set[str]] = defaultdict(set)
+    docx_count = 0
+    for spec in specs:
+        per_family[spec.family] += 1
+        per_intent[spec.intent].add(spec.placement)
+        if spec.is_docx:
+            docx_count += 1
+
+    for family, count in sorted(per_family.items()):
+        if count < MIN_PER_FAMILY:
+            problems.append(f"family {family!r} has {count} attacks, needs {MIN_PER_FAMILY}")
+    for intent, placements in sorted(per_intent.items()):
+        if len(placements) < MIN_PLACEMENTS_PER_INTENT:
+            problems.append(
+                f"intent {intent!r} spans {len(placements)} placements, "
+                f"needs {MIN_PLACEMENTS_PER_INTENT}"
+            )
+    if docx_count < MIN_DOCX:
+        problems.append(f"{docx_count} docx attacks, needs {MIN_DOCX}")
+    tool_results = per_family.get("tool_result", 0)
+    if tool_results < MIN_TOOL_RESULT:
+        problems.append(f"{tool_results} tool_result attacks, needs {MIN_TOOL_RESULT}")
+    return problems
+
+
 def build_one(spec: AttackSpec, out_dir: Path = OUT_DIR) -> Path:
     profile = yaml.safe_load(spec.profile_path.read_text(encoding="utf-8"))
     payload = spec.payload_path.read_text(encoding="utf-8").strip()
     module = importlib.import_module(GENERATORS[spec.family])
     Path(out_dir).mkdir(parents=True, exist_ok=True)
     return module.build(profile, payload, Path(out_dir), spec.id, placement=spec.placement)
+
+
+def artefact_path(spec: AttackSpec, out_dir: Path = OUT_DIR) -> Path:
+    """Where `build_one` puts this attack's document."""
+    suffix = ".docx" if spec.is_docx else ".pdf"
+    return Path(out_dir) / f"{spec.id}{suffix}"
+
+
+def ats_seed_for(spec: AttackSpec, out_dir: Path = OUT_DIR) -> Path:
+    """The seed this attack should run against.
+
+    Only the `ats_notes` placement poisons the ATS; everything else uses the
+    clean fixture. Returning the clean seed by default is what stops one
+    attack's poison leaking into the next run.
+    """
+    from corpus.attacks.generators.tool_result import CLEAN_SEED, ats_seed_path
+
+    candidate = ats_seed_path(Path(out_dir), spec.id)
+    return candidate if candidate.is_file() else CLEAN_SEED
 
 
 def build_all(

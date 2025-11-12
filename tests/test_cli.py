@@ -60,7 +60,6 @@ def test_unknown_approval_mode_is_rejected(tmp_path):
 @pytest.mark.parametrize(
     "argv,phase",
     [
-        (["approve", "--run", "r1"], "Phase 3"),
         (["benign", "build"], "Phase 4"),
         (["benign", "run", "--configs", "full"], "Phase 4"),
     ],
@@ -80,6 +79,12 @@ def test_ingest_reports_rules_on_a_real_attack_file():
     result = runner.invoke(app, ["ingest", str(path)])
     assert result.exit_code == 0, result.output
     assert "ING-001" in result.output
+
+
+def test_approve_rejects_an_unknown_run():
+    result = runner.invoke(app, ["approve", "--run", "does-not-exist"])
+    assert result.exit_code != 0
+    assert "no run at" in result.output
 
 
 def test_redteam_run_is_never_invoked_without_a_fake_client():

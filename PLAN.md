@@ -290,6 +290,25 @@ is the documented discovery, not the feature.
    policy layer for mechanical failures in the "rules fired" table and overstated what it
    caught. Only the taint gate passes a real rule id (POL-002).
 
+## Findings from Phase 3
+
+1. **CLS-101 fired zero times across all 70 attacks.** The instruction-phrasing
+   regexes caught nothing, because the payloads are written the way a real applicant
+   would write them rather than as "IGNORE ALL PREVIOUS INSTRUCTIONS". CLS-102 caught
+   only the five `forged_structure` attacks, which literally contain `SYSTEM:`. This is
+   the project's thesis expressed as a number, and the README should lead with it: the
+   advisory layer is evidence, not a control. Keep both rules in the report showing 0
+   rather than omitting empty rows.
+2. **DOCX core properties cap at 255 characters each.** Payloads are roughly 450, so
+   `docx_core_props` splits across subject, keywords, comments and category. Truncating
+   would have quietly tested a weaker attack than the manifest claims.
+3. **The `encoding` body-text blocker from Phase 1 is resolved by format, not fonts.**
+   `homoglyph` and `zero_width` are DOCX attacks; Word keeps Unicode intact where
+   reportlab's standard fonts destroy it. No TTF embedding was needed.
+4. **The output scanner logs every hit, not just the deciding one.** The first blocking
+   rule still decides, but logging only that hid OUT-003 and OUT-004 whenever OUT-002
+   matched first, understating those rules in the report.
+
 ## Standing constraints
 
 Carried from spec §21, the ones easiest to violate by accident while implementing:

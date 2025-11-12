@@ -193,12 +193,14 @@ def run_started(
     config: dict[str, Any],
     doc_sha256: str,
     corpus_item_id: str | None = None,
+    classifier: str | None = None,
 ) -> None:
     _emit(
         ctx,
         "run_started",
         agent_model=agent_model,
         reader_model=reader_model,
+        classifier=classifier,
         defense_config=config,
         doc_sha256=doc_sha256,
         corpus_item_id=corpus_item_id,
@@ -385,4 +387,20 @@ def run_finished(
         duration_s=duration_s,
         total_input_tokens=total_input_tokens,
         total_output_tokens=total_output_tokens,
+    )
+
+
+def heuristic_flagged(
+    ctx: RunContext, *, rule_id: str, locator: str, match_redacted: str, text_len: int
+) -> None:
+    """CLS-101 / CLS-102. Advisory only: this event never accompanies a taint
+    change or a denial, which is what makes it readable as 'what phrase-matching
+    would have caught' in the report."""
+    _emit(
+        ctx,
+        "heuristic_flagged",
+        rule_id=rule_id,
+        locator=locator,
+        match_redacted=match_redacted,
+        text_len=text_len,
     )

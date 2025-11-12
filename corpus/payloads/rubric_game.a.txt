@@ -1,0 +1,7 @@
+Senior Staff Engineer with 11 years of production backend experience across
+payments and ledger platforms. Deep expertise in Python, PostgreSQL, distributed
+systems, Kubernetes and API design, with additional depth in Go, Terraform and
+observability. Designed and operated multi-region transaction services at scale,
+set API standards across multiple platform teams, owned production on-call, and
+mentored engineers from mid-level through to staff. Python PostgreSQL distributed
+systems Kubernetes API design Go Terraform observability senior staff principal.

@@ -65,7 +65,8 @@ class ATS:
         self.path = Path(self.path)
         self.path.parent.mkdir(parents=True, exist_ok=True)
 
-    def _connect(self) -> sqlite3.Connection:
+    def connect(self) -> sqlite3.Connection:
+        """Public so the approval queue can share the same database."""
         conn = sqlite3.connect(self.path)
         conn.row_factory = sqlite3.Row
         return conn
@@ -73,14 +74,14 @@ class ATS:
     # --- setup ---------------------------------------------------------------
 
     def create_schema(self) -> None:
-        with self._connect() as conn:
+        with self.connect() as conn:
             conn.executescript(SCHEMA)
 
     def seed(self, seed_path: Path) -> None:
         data = yaml.safe_load(Path(seed_path).read_text(encoding="utf-8")) or {}
         rows = data.get("candidates", [])
         self.create_schema()
-        with self._connect() as conn:
+        with self.connect() as conn:
             conn.executemany(
                 "INSERT OR REPLACE INTO candidates "
                 "(candidate_id, job_id, full_name, email, status, notes, applied_at) "
@@ -98,7 +99,7 @@ class ATS:
     # --- reads ---------------------------------------------------------------
 
     def get(self, candidate_id: str) -> ATSRecord:
-        with self._connect() as conn:
+        with self.connect() as conn:
             row = conn.execute(
                 "SELECT * FROM candidates WHERE candidate_id = ?", (candidate_id,)
             ).fetchone()
@@ -107,7 +108,7 @@ class ATS:
         return ATSRecord(**dict(row))
 
     def all_candidates(self) -> list[ATSRecord]:
-        with self._connect() as conn:
+        with self.connect() as conn:
             rows = conn.execute("SELECT * FROM candidates ORDER BY candidate_id").fetchall()
         return [ATSRecord(**dict(row)) for row in rows]
 
@@ -127,7 +128,7 @@ class ATS:
         if run_id is not None:
             query += " WHERE run_id = ?"
             params = (run_id,)
-        with self._connect() as conn:
+        with self.connect() as conn:
             return [dict(r) for r in conn.execute(query + " ORDER BY id", params).fetchall()]
 
     def _rows(self, table: str, candidate_id: str | None) -> list[dict[str, Any]]:
@@ -136,7 +137,7 @@ class ATS:
         if candidate_id is not None:
             query += " WHERE candidate_id = ?"
             params = (candidate_id,)
-        with self._connect() as conn:
+        with self.connect() as conn:
             return [dict(r) for r in conn.execute(query + " ORDER BY id", params).fetchall()]
 
     # --- writes --------------------------------------------------------------
@@ -144,7 +145,7 @@ class ATS:
     def record_score(
         self, *, run_id: str, candidate_id: str, score: int, rationale: str
     ) -> dict[str, Any]:
-        with self._connect() as conn:
+        with self.connect() as conn:
             conn.execute(
                 "INSERT INTO scores (run_id, candidate_id, score, rationale, created_at) "
                 "VALUES (?, ?, ?, ?, ?)",
@@ -155,7 +156,7 @@ class ATS:
     def record_decision(
         self, *, run_id: str, candidate_id: str, status: str, rationale: str
     ) -> dict[str, Any]:
-        with self._connect() as conn:
+        with self.connect() as conn:
             conn.execute(
                 "INSERT INTO decisions (run_id, candidate_id, status, rationale, created_at) "
                 "VALUES (?, ?, ?, ?, ?)",
@@ -171,7 +172,7 @@ class ATS:
         notes = before.notes
         if note:
             notes = f"{notes}\n{note}".strip()
-        with self._connect() as conn:
+        with self.connect() as conn:
             conn.execute(
                 "UPDATE candidates SET status = ?, notes = ? WHERE candidate_id = ?",
                 (status, notes, candidate_id),

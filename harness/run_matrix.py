@@ -85,9 +85,15 @@ def run_cell(
     runs_root: Path | None = None,
     candidate_id: str = "C001",
     job_id: str = "J001",
+    approval: str = "auto",
+    guard: Any = None,
 ) -> dict[str, Any]:
     cfg = doorman_config.preset(cfg_name)
-    doc_path = Path(attacks_dir) / f"{spec.id}.pdf"
+    doc_path = attack_build.artefact_path(spec, Path(attacks_dir))
+    # tool_result/ats_notes attacks ship their own poisoned seed next to the
+    # document. Everything else starts from the clean one, so no run can inherit
+    # another attack's poison (spec 13).
+    seed = attack_build.ats_seed_for(spec, Path(attacks_dir))
     row: dict[str, Any] = {
         "config": cfg_name, "corpus": "attacks", "item_id": spec.id,
         "family": spec.family, "placement": spec.placement, "rep": rep,
@@ -97,6 +103,7 @@ def run_cell(
             client, settings, cfg,
             doc_path=doc_path, candidate_id=candidate_id, job_id=job_id,
             runs_root=runs_root, corpus_item_id=spec.id,
+            approval=approval, guard=guard, ats_seed=seed,
         )
     except Exception as exc:  # a crashed run is a result, not a gap in the table
         return {
@@ -143,6 +150,7 @@ def run(
     attacks_dir: Path = attack_build.OUT_DIR,
     runs_root: Path | None = None,
     settings: Settings | None = None,
+    guard: Any = None,
 ) -> Path:
     settings = settings or Settings()
     specs = attack_build.load_manifest()
@@ -162,6 +170,7 @@ def run(
                     row = run_cell(
                         client_factory(), settings, spec, cfg_name, rep,
                         attacks_dir=attacks_dir, runs_root=runs_root,
+                        approval=approval, guard=guard,
                     )
                     row["approval"] = approval
                     handle.write(json.dumps(row) + "\n")

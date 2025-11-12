@@ -23,6 +23,8 @@ from doorman.agent import prompts
 from doorman.agent.loop import Router, run_phase
 from doorman.agent.tools import NAIVE_TOOLS, tools_for
 from doorman.config import CONFIG_DIR, DefenseConfig, Settings, run_dir
+from doorman.guard import scan as guard_scan
+from doorman.guard.classifier import Guard, build_guard
 from doorman.ingest import hidden, loader
 from doorman.models import (
     ATSRecord,
@@ -59,6 +61,7 @@ class RunResult:
     output_tokens: int = 0
     duration_s: float = 0.0
     doc_sha256: str = ""
+    classifier: str = ""
     canary: str = ""          # needed by the canary_leaked oracle
     trusted_email: str = ""   # needed by the email_recipient_not_ats oracle
     events_path: Path | None = None
@@ -160,6 +163,8 @@ def run_candidate(
     runs_root: Path | None = None,
     ats_seed: Path = DEFAULT_ATS_SEED,
     corpus_item_id: str | None = None,
+    approval: str = "auto",
+    guard: Guard | None = None,
 ) -> RunResult:
     """Screen one candidate end to end under `cfg`."""
     started = time.perf_counter()
@@ -186,7 +191,13 @@ def run_candidate(
             trusted_email=record.email,
             trusted_full_name=record.full_name,
             batch_candidate_ids=ats.other_candidate_ids(candidate_id),
+            batch_candidate_names={
+                record_.full_name
+                for record_ in ats.all_candidates()
+                if record_.candidate_id != candidate_id
+            },
         )
+        active_guard = guard if guard is not None else build_guard(cfg.classifier)
         trace.run_started(
             ctx,
             agent_model=settings.agent_model,
@@ -194,10 +205,20 @@ def run_candidate(
             config=cfg.as_dict(),
             doc_sha256=doc.sha256,
             corpus_item_id=corpus_item_id,
+            classifier=getattr(active_guard, "name", type(active_guard).__name__),
         )
 
         rules_fired = _apply_ingestion_taint(ctx, doc, cfg)
-        router = Router(ctx=ctx, cfg=cfg, settings=settings, ats=ats, outbox=outbox)
+
+        # Advisory heuristics always run; the classifier only when enabled.
+        rules_fired += guard_scan.scan_heuristics(doc, ctx)
+        summary = guard_scan.scan_document(doc, ctx, cfg, settings, active_guard)
+        rules_fired += summary.flagged
+
+        router = Router(
+            ctx=ctx, cfg=cfg, settings=settings, ats=ats, outbox=outbox,
+            approval_mode=approval, guard=active_guard,
+        )
 
         if cfg.phase_allowlists:
             phase_result = _phased(
@@ -226,11 +247,12 @@ def run_candidate(
             score=router.score,
             decision=router.decision,
             taint=ctx.taint,
-            rules_fired=rules_fired,
+            rules_fired=sorted(set(rules_fired)),
             input_tokens=phase_result.input_tokens,
             output_tokens=phase_result.output_tokens,
             duration_s=round(duration, 3),
             doc_sha256=doc.sha256,
+            classifier=getattr(active_guard, "name", type(active_guard).__name__),
             canary=ctx.canary,
             trusted_email=ctx.trusted_email,
             events_path=events_path,

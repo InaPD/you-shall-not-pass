@@ -94,7 +94,8 @@ def run(
     cfg = config.preset(config_name)
     client = anthropic.Anthropic()
     result = orchestrator.run_candidate(
-        client, settings, cfg, doc_path=doc, candidate_id=candidate, job_id=job
+        client, settings, cfg, doc_path=doc, candidate_id=candidate, job_id=job,
+        approval=approval,
     )
     typer.echo(
         f"run {result.run_id}  status={result.status}  score={result.score}  "
@@ -160,7 +161,83 @@ def approve(
     run_id: str = typer.Option(..., "--run", help="Run id whose pending actions to review."),
 ) -> None:
     """Review and resolve pending irreversible actions."""
-    _todo("approve", "Phase 3")
+
+    from doorman.approvals.queue import ApprovalQueue
+    from doorman.tools import effects
+    from doorman.tools.ats import ATS
+    from doorman.tools.email import Outbox
+
+    directory = config.run_dir(run_id)
+    if not directory.is_dir():
+        raise typer.BadParameter(f"no run at {directory}")
+
+    ats = ATS(directory / "ats.db")
+    outbox = Outbox(directory / "outbox.jsonl")
+    queue = ApprovalQueue(ats)
+    actions = queue.pending(run_id)
+    if not actions:
+        typer.echo(f"no pending actions for {run_id}")
+        return
+
+    events = _load_events(directory / "events.jsonl")
+    for action in actions:
+        record = ats.get(action.candidate_id)
+        typer.echo("")
+        typer.echo(f"action {action.id}: {action.tool}  (held by {action.rule_id})")
+        for line in effects.preview(action.tool, action.args, record):
+            typer.echo(line)
+        context = _context_lines(events, action.trace_id)
+        if context:
+            typer.echo("  why it was held:")
+            for line in context:
+                typer.echo(f"    {line}")
+        choice = typer.prompt("  [a]pprove / [r]eject / [s]kip", default="s").strip().lower()
+        if choice.startswith("s"):
+            continue
+        approved = choice.startswith("a")
+        queue.resolve(action.id, approved=approved, resolver=f"human:{run_id}")
+        if not approved:
+            typer.echo("  rejected")
+            continue
+        if action.tool == "send_email":
+            effects.send_email(outbox, run_id=run_id, record=record, args=action.args)
+        elif action.tool == "ats_update":
+            effects.ats_update(ats, candidate_id=action.candidate_id, args=action.args)
+        typer.echo("  approved and executed")
+
+
+def _load_events(path: Path) -> list[dict]:
+    if not path.is_file():
+        return []
+    import json
+
+    return [
+        json.loads(line)
+        for line in path.read_text(encoding="utf-8").splitlines()
+        if line.strip()
+    ]
+
+
+# Spec 14: show the human why this action was held, not just what it would do.
+_CONTEXT_EVENTS = (
+    "policy_decision", "hidden_text_detected", "classifier_verdict",
+    "output_blocked", "taint_changed",
+)
+
+
+def _context_lines(events: list[dict], trace_id: str) -> list[str]:
+    lines: list[str] = []
+    for event in events:
+        if event.get("trace_id") != trace_id:
+            continue
+        if event.get("event") not in _CONTEXT_EVENTS:
+            continue
+        if event.get("event") == "policy_decision" and event.get("decision") == "allow":
+            continue
+        detail = event.get("rule_id") or event.get("cause_rule_id") or ""
+        locator = event.get("locator") or event.get("span_id") or event.get("metadata_key") or ""
+        lines.append(f"{event['event']:<22} {detail:<9} {locator}".rstrip())
+    return lines[:20]
 
 
 @app.command()

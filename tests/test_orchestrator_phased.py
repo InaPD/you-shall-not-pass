@@ -15,6 +15,7 @@ from corpus.attacks import build
 from doorman import config
 from doorman.agent import orchestrator
 from doorman.config import Settings
+from doorman.guard.classifier import NullGuard
 from doorman.models import Taint
 from doorman.policy import phases
 from doorman.tools.ats import ATS
@@ -30,11 +31,16 @@ def attack_files(tmp_path_factory):
     return {spec.id: path for spec, path in build.build_all(out_dir=out)}
 
 
-def run(client, tmp_path, doc_path, *, preset="full", candidate="C001"):
+def run(client, tmp_path, doc_path, *, preset="full", candidate="C001",
+        guard=None, approval="auto"):
+    """The guard is always injected. `build_guard` deliberately has no fallback:
+    a `full` run without the extra installed must fail loudly rather than quietly
+    report a classifier it never had."""
     return orchestrator.run_candidate(
         client, Settings(), config.preset(preset),
         doc_path=doc_path, candidate_id=candidate, job_id="J001",
         run_id="phased-test", runs_root=tmp_path, ats_seed=SEED,
+        guard=guard or NullGuard(), approval=approval,
     )
 
 

@@ -121,8 +121,16 @@ def metadata_reasons(value: str) -> list[str]:
 
 def evaluate(doc: Document, settings: Settings) -> Document:
     """Return a new Document with `hidden_reasons` and `metadata_flags` filled in."""
+    # Reasons already on the span (ING-007 is decided by the DOCX parser, since
+    # it is a property of the XML rather than of geometry) are preserved.
     spans = [
-        span.model_copy(update={"hidden_reasons": span_reasons(span, doc, settings)})
+        span.model_copy(
+            update={
+                "hidden_reasons": sorted(
+                    set(span.hidden_reasons) | set(span_reasons(span, doc, settings))
+                )
+            }
+        )
         for span in doc.spans
     ]
     flags = {

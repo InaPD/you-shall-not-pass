@@ -245,4 +245,7 @@ class RunContext(BaseModel):
     # is an equality check on one value, OUT-002 is a host membership test.
     trusted_portfolio_url: str | None = None
     budgets_used: dict[str, int] = Field(default_factory=dict)
-    batch_candidate_ids: set[str] = Field(default_factory=set)  # for OUT-004
+    # OUT-004 needs both: the spec names candidate_id and full_name, and a set of
+    # ids alone cannot match a name appearing in outbound prose.
+    batch_candidate_ids: set[str] = Field(default_factory=set)
+    batch_candidate_names: set[str] = Field(default_factory=set)
