@@ -15,9 +15,9 @@ Five of these are listed in the spec as human-owned. Status and recommendation f
 
 | # | Decision | Recommendation | Blocks |
 |---|---|---|---|
-| 1 | Pin model IDs | `claude-sonnet-5` (agent) is current. For the reader, the spec pins `claude-haiku-4-5-20251001` but the current API reference lists the ID as `claude-haiku-4-5` with no date suffix and warns against appending one. Verify both on the models overview page before the first paid run, and fill `config/pricing.yaml` from the pricing page. | Phase 1 (first real API call) |
+| 1 | Pin model IDs | **Resolved at the Phase 4 gate.** `claude-sonnet-5` (agent) and `claude-haiku-4-5` (reader) - no date suffix; the dated form the spec wrote is rejected. `config/pricing.yaml` filled from the same reference: $2/$10 and $1/$5 per MTok. | Phase 1 (first real API call) |
 | 2 | PDF-first, DOCX in P3 | Accept. DOCX ingestion is a separate parser with its own rule set (ING-007, comments, tracked changes); deferring it keeps Phase 1-2 short. The `Document` model is format-agnostic, so nothing needs rework. | Phase 1 scope |
-| 3 | Repeats: 3 attacks / 1 benign | Accept, but confirm budget at the Phase 4 gate, not now. Token estimate below. | Phase 4 |
+| 3 | Repeats: 3 attacks / 1 benign | **Confirmed at the Phase 4 gate.** 3 reps kept: about $90 for the full matrix against $67 at 2 reps, and repeats are now the only handle on run variance (open item 1). | Phase 4 |
 | 4 | Classifier backend | `transformers` + CPU `torch`. Revisit only if install size or per-unit latency becomes the bottleneck in Phase 3. | Phase 3 |
 | 5 | Keep `personal_note` in hardened tools | Yes. Without a free-text channel the output scanner has nothing to defend and the bypass hunt in Phase 5 has nowhere to look. Removing it would make `full` look better than it is. | Phase 2 |
 
@@ -25,8 +25,8 @@ Two further ambiguities found in the spec that need an answer before the phase t
 
 - **Which 3 configs for the benign corpus?** M4's acceptance line says `100 x 3 x 1`, but §18
   does not name the three. `score_drift` is defined as `|score(full) - score(none)|`, so `none`
-  and `full` are mandatory. Recommendation: the third is `full_minus_classifier`, which isolates
-  how much of the false-positive rate the classifier alone is responsible for. Decide at Phase 4.
+  and `full` are mandatory. **Decided at Phase 4: the third is `full_minus_classifier`**, which
+  isolates how much of the false-positive rate the classifier alone is responsible for.
 - **The `skip_confirmation` oracle is only meaningful under `--approval deny`.** Under
   `--approval auto` every queued action resolves with `resolver="harness-auto"`, so
   "executed, and no human approval" is trivially true for every run, attack or not. Either run
@@ -220,18 +220,24 @@ allowlist in `test_rules_registry.py` is now empty.
 
 **Gate:** the full matrix completes; `REPORT.md` has every section of §18.
 
-**Budget check before launching.** Rough volume, assuming a phased run is about 6 model calls at
-roughly 25k input / 2k output tokens total:
+**Budget check before launching.** `config/pricing.yaml` is now filled (`claude-sonnet-5`
+$2/$10 per MTok, `claude-haiku-4-5` $1/$5) and the manifest holds 70 attacks, not 60:
 
-- attacks: 60 x 5 configs x 3 reps = 900 runs
+- attacks: 70 x 5 configs x 3 reps = 1,050 runs
 - benign: 100 x 3 configs x 1 rep = 300 runs
-- total ~1,200 runs, order of 30M input and 2.5M output tokens
+- benign generation: 100 reader calls, about $0.70, paid once and cached
 
-Multiply by the values in `config/pricing.yaml` once filled. Two cost levers if the number is
-uncomfortable: drop attack repeats from 3 to 2 (the spec allows confirming this at this gate),
-or cut benign to 2 configs (`none` and `full`), which still yields `score_drift` but loses the
-classifier's isolated FPR contribution. Prefer cutting repeats; the benign corpus is the half of
-the result most projects skip and it is what makes the rest credible.
+At roughly 22k agent input / 1.8k agent output plus 3k/0.4k on the reader, a phased run costs
+about **$0.067**, so the full matrix is about **$90**: $70 attacks, $20 benign. Dropping attack
+repeats to 2 brings it to **$67**.
+
+**Recommendation: keep 3 reps.** Sampling parameters were removed on this model family (open item
+1), so repeats are now the only handle on run variance, and $23 is not worth giving that up.
+
+**Benign configs: `none`, `full_minus_classifier`, `full`** - the pre-flight recommendation,
+confirmed here. `none` and `full` are mandatory for `score_drift`; the third isolates how much of
+the false-positive rate the classifier alone is responsible for, which is the one number a reader
+cannot reconstruct from the other two.
 
 **Watch for:** resumability is not optional at this scale. Test it by killing a run mid-matrix
 and restarting before committing to the full sweep.
@@ -308,6 +314,57 @@ is the documented discovery, not the feature.
 4. **The output scanner logs every hit, not just the deciding one.** The first blocking
    rule still decides, but logging only that hid OUT-003 and OUT-004 whenever OUT-002
    matched first, understating those rules in the report.
+
+## Findings from Phase 4
+
+1. **The three layout variants existed in name only.** `pdf_resume.render` validated
+   `layout` against a tuple and then drew the same single column for all three, so
+   "rendered across 3 layout variants" would have been true of the manifest and false
+   of the corpus. They are real now, and a test asserts the three carry identical
+   words - layout is allowed to be a variable in the benign corpus, never a difference
+   in content.
+2. **A CLI test wrote 100 rows into the real results file.** `tests/test_cli.py` invoked
+   `doorman benign run` the moment the command stopped raising `NotImplementedError`,
+   and each failed cell was appended to `harness/out/results.jsonl` - the file
+   `doorman report` builds REPORT.md from. The existing guard only knew about
+   `redteam run`; it now covers both corpora and `benign build`, which spends money.
+   This is the cheapest possible version of a fabricated result and it happened on the
+   first run of the suite after wiring the command.
+3. **Cost cannot be computed from one token total.** A phased run uses two models at
+   different prices, so `RunResult` now reports reader tokens separately and the row's
+   `cost_usd` prices each at its own rate. Attributing everything to the agent model
+   would have overstated the bill by about 4%.
+4. **Reader model ID resolved (pre-flight decision 1).** `claude-haiku-4-5`, no date
+   suffix - the dated form the spec wrote is rejected. Changed before the first paid
+   matrix, which is the last moment it was free to change.
+5. **Thirteen of the hundred benign resumes are DOCX.** A PDF-only benign corpus cannot
+   produce a false positive for ING-007 or the comment channel, because it never
+   exercises them; the false-positive rate would have been silently blind to the format
+   where those rules live.
+6. **`BEN-095` is a classifier hard negative, not an ING-007 one.** A DOCX comment is
+   extracted as metadata, not as a vanished run, so the rule that reads it is CLS-002.
+   Worth stating because the obvious reading of "resume with a comment in it" is the
+   wrong one.
+7. **Email and portfolio URL are pinned after generation, not asked for.** The model
+   picks neither: the address is forced onto `example.com`, and only the one spec with a
+   fixture page behind it gets a `portfolio.example` link. An unresolvable portfolio URL
+   would add a tool failure to a benign run that has nothing to do with the defences.
+8. **A crashed run was being counted as a security outcome.** `_error_row` writes
+   `executed=False, aborted=True`, and the report fed every row into the tables, so a
+   cell that died on a rate limit lowered the reported ASR of whichever config it landed
+   under and raised the reported FPR of whichever applicant it hit. Rates are now
+   computed over completed runs only; errored runs stay in the appendix and the Errors
+   section, and the header says how many were excluded. A run the *defences* aborted -
+   reader failure, no decision recorded - still counts as `FP_hard`, which is the
+   distinction that matters.
+9. **Decision agreement counted `None == None` as agreement.** A config that aborted
+   every benign run would have reported 100% agreement with the baseline. Both sides
+   must now have reached a decision to be paired at all.
+10. **The two-column layout could put the main column on the wrong page.** Both columns
+    draw onto one canvas and `showPage()` is global, so a sidebar that overflowed first
+    pushed every later line of the main column onto the next page, beside nothing. The
+    columns are now recorded per page and replayed together. The identical-words check
+    would never have caught this - the words are all still there, in the wrong place.
 
 ## Standing constraints
 

@@ -37,7 +37,39 @@ HEADING_SIZE = 11.5
 NAME_SIZE = 19.0
 LEADING = 13.5
 
-LAYOUTS = ("single_column", "two_column", "minimal")
+
+@dataclass(frozen=True)
+class Style:
+    """What a layout variant is allowed to change.
+
+    Nothing here touches the words, only how they are set, so the same profile
+    rendered under any variant carries identical text. That is what keeps layout
+    a variable in the false-positive numbers rather than a confound.
+    """
+
+    accent: tuple[float, float, float] = (0.12, 0.2, 0.35)
+    heading_rule: bool = True
+    heading_size: float = HEADING_SIZE
+    leading: float = LEADING
+    columns: int = 1
+
+
+# Spec 17: single column; two column with coloured headings; minimal.
+LAYOUT_STYLES: dict[str, Style] = {
+    "single_column": Style(),
+    "two_column": Style(accent=(0.06, 0.42, 0.44), columns=2),
+    "minimal": Style(
+        accent=(0.0, 0.0, 0.0), heading_rule=False, heading_size=10.5, leading=12.5
+    ),
+}
+
+LAYOUTS = tuple(LAYOUT_STYLES)
+
+# Which sections move to the narrow column under `two_column`. Anything not named
+# here - every injected `extra_sections` entry included - stays in the main flow.
+SIDEBAR_HEADINGS = ("Skills", "Education", "Languages")
+SIDEBAR_FRACTION = 0.34
+COLUMN_GAP = 20.0
 
 
 @dataclass(frozen=True)
@@ -59,6 +91,9 @@ class Section:
     heading: str
     paragraphs: list[str] = field(default_factory=list)
     bullets: list[str] = field(default_factory=list)
+    # Rows of an optional grid, first row treated as the header. Spec 17 asks for
+    # one benign resume laid out with tables; nothing else uses this.
+    table: list[list[str]] = field(default_factory=list)
 
 
 def _wrap(text: str, font: str, size: float, width: float) -> list[str]:
@@ -78,10 +113,18 @@ def _wrap(text: str, font: str, size: float, width: float) -> list[str]:
 class _Cursor:
     """Tracks the drawing position and breaks pages when the body runs out."""
 
-    def __init__(self, canvas: pdfcanvas.Canvas, width: float = BODY_WIDTH) -> None:
+    def __init__(
+        self,
+        canvas: Any,  # a reportlab Canvas, or a _PageRecorder standing in for one
+        width: float = BODY_WIDTH,
+        *,
+        style: Style | None = None,
+        x: float = MARGIN,
+    ) -> None:
         self.canvas = canvas
         self.width = width
-        self.x = MARGIN
+        self.style = style or LAYOUT_STYLES["single_column"]
+        self.x = x
         self.y = PAGE_HEIGHT - MARGIN
         self.page = 1
 
@@ -92,7 +135,8 @@ class _Cursor:
             self.y = PAGE_HEIGHT - MARGIN
 
     def text(self, body: str, *, font: str = BODY_FONT, size: float = BODY_SIZE,
-             leading: float = LEADING, indent: float = 0.0) -> None:
+             leading: float | None = None, indent: float = 0.0) -> None:
+        leading = self.style.leading if leading is None else leading
         for line in _wrap(body, font, size, self.width - indent):
             self._break_if_needed(leading)
             self.canvas.setFont(font, size)
@@ -105,15 +149,48 @@ class _Cursor:
 
     def heading(self, title: str) -> None:
         self.gap(6.0)
-        self._break_if_needed(LEADING * 2)
-        self.canvas.setFont(BOLD_FONT, HEADING_SIZE)
-        self.canvas.setFillColorRGB(0.12, 0.2, 0.35)
+        self._break_if_needed(self.style.leading * 2)
+        self.canvas.setFont(BOLD_FONT, self.style.heading_size)
+        self.canvas.setFillColorRGB(*self.style.accent)
         self.canvas.drawString(self.x, self.y, title.upper())
         self.y -= 4.0
-        self.canvas.setStrokeColorRGB(0.75, 0.78, 0.82)
-        self.canvas.setLineWidth(0.6)
-        self.canvas.line(self.x, self.y, self.x + self.width, self.y)
-        self.y -= LEADING
+        if self.style.heading_rule:
+            self.canvas.setStrokeColorRGB(0.75, 0.78, 0.82)
+            self.canvas.setLineWidth(0.6)
+            self.canvas.line(self.x, self.y, self.x + self.width, self.y)
+        self.y -= self.style.leading
+
+    def table(self, rows: list[list[str]]) -> None:
+        """A plain grid. Cells are single lines, truncated rather than wrapped, so
+        a table never silently reflows into something the reader cannot match."""
+        if not rows:
+            return
+        columns = max(len(row) for row in rows)
+        cell_width = self.width / columns
+        for index, row in enumerate(rows):
+            self._break_if_needed(self.style.leading)
+            font = BOLD_FONT if index == 0 else BODY_FONT
+            self.canvas.setFont(font, BODY_SIZE - 0.5)
+            self.canvas.setFillColorRGB(0, 0, 0)
+            for column, cell in enumerate(row):
+                self.canvas.drawString(
+                    self.x + column * cell_width + 2.0,
+                    self.y,
+                    _clip(str(cell), font, BODY_SIZE - 0.5, cell_width - 6.0),
+                )
+            self.y -= 4.0
+            self.canvas.setStrokeColorRGB(0.82, 0.84, 0.88)
+            self.canvas.setLineWidth(0.4)
+            self.canvas.line(self.x, self.y, self.x + self.width, self.y)
+            self.y -= self.style.leading - 4.0
+
+
+def _clip(text: str, font: str, size: float, width: float) -> str:
+    if pdfmetrics.stringWidth(text, font, size) <= width:
+        return text
+    while text and pdfmetrics.stringWidth(text + "...", font, size) > width:
+        text = text[:-1]
+    return text + "..."
 
 
 def _draw_header(cursor: _Cursor, profile: dict[str, Any]) -> None:
@@ -169,6 +246,81 @@ def _draw_sections(cursor: _Cursor, sections: list[Section]) -> None:
             indent = 10.0 if bullet.startswith("    -") else 0.0
             font = BODY_FONT if indent else BOLD_FONT
             cursor.text(bullet.strip().lstrip("- ").strip(), font=font, indent=indent)
+        cursor.table(section.table)
+
+
+class _PageRecorder:
+    """A canvas stand-in that records drawing calls against a page number.
+
+    Two columns share one canvas but are drawn one after the other, and
+    `showPage()` is global state: if the sidebar overflowed onto page two, every
+    later `drawString` from the main column would land there too, next to
+    nothing. Recording each column and replaying page by page keeps the columns
+    side by side however long either one runs.
+    """
+
+    _METHODS = ("setFont", "setFillColorRGB", "drawString", "setStrokeColorRGB",
+                "setLineWidth", "line", "drawImage", "saveState", "restoreState")
+
+    def __init__(self) -> None:
+        self.page = 0
+        self.ops: dict[int, list[tuple[str, tuple[Any, ...], dict[str, Any]]]] = {}
+
+    def __getattr__(self, name: str) -> Any:
+        if name not in self._METHODS:
+            raise AttributeError(name)
+
+        def record(*args: Any, **kwargs: Any) -> None:
+            self.ops.setdefault(self.page, []).append((name, args, kwargs))
+
+        return record
+
+    def showPage(self) -> None:  # noqa: N802 - the reportlab canvas spelling
+        self.page += 1
+
+    def pages(self) -> int:
+        return max(self.ops, default=0) + 1
+
+    def replay(self, canvas: pdfcanvas.Canvas, page: int) -> None:
+        for name, args, kwargs in self.ops.get(page, ()):
+            getattr(canvas, name)(*args, **kwargs)
+
+
+def _draw_two_column(
+    canvas: pdfcanvas.Canvas,
+    profile: dict[str, Any],
+    sections: list[Section],
+    style: Style,
+) -> None:
+    """Header across the full width, then a narrow left column beside a main one.
+
+    Each column is recorded independently and the two are replayed page by page,
+    so a sidebar that runs long never displaces the main column.
+    """
+    side_width = BODY_WIDTH * SIDEBAR_FRACTION
+    main_width = BODY_WIDTH - side_width - COLUMN_GAP
+
+    head = _PageRecorder()
+    header = _Cursor(head, style=style)
+    _draw_header(header, profile)
+    top = header.y - 6.0
+
+    left = _PageRecorder()
+    sidebar = _Cursor(left, side_width, style=style)
+    sidebar.y = top
+    _draw_sections(sidebar, [s for s in sections if s.heading in SIDEBAR_HEADINGS])
+
+    right = _PageRecorder()
+    main = _Cursor(right, main_width, style=style, x=MARGIN + side_width + COLUMN_GAP)
+    main.y = top
+    _draw_sections(main, [s for s in sections if s.heading not in SIDEBAR_HEADINGS])
+
+    for page in range(max(head.pages(), left.pages(), right.pages())):
+        if page:
+            canvas.showPage()
+        head.replay(canvas, page)
+        left.replay(canvas, page)
+        right.replay(canvas, page)
 
 
 def _draw_overlay(canvas: pdfcanvas.Canvas, overlay: Overlay) -> None:
@@ -217,9 +369,14 @@ def render(
         canvas.setKeywords(metadata.get("keywords", ""))
         canvas.setCreator(metadata.get("creator", "reportlab"))
 
-    cursor = _Cursor(canvas)
-    _draw_header(cursor, profile)
-    _draw_sections(cursor, _profile_sections(profile) + list(extra_sections or []))
+    style = LAYOUT_STYLES[layout]
+    sections = _profile_sections(profile) + list(extra_sections or [])
+    if style.columns == 2:
+        _draw_two_column(canvas, profile, sections, style)
+    else:
+        cursor = _Cursor(canvas, style=style)
+        _draw_header(cursor, profile)
+        _draw_sections(cursor, sections)
 
     for overlay in overlays or []:
         _draw_overlay(canvas, overlay)

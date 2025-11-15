@@ -59,6 +59,10 @@ class RunResult:
     rules_fired: list[str] = field(default_factory=list)
     input_tokens: int = 0
     output_tokens: int = 0
+    # Split out because the reader runs on a different model at a different
+    # price; one combined number cannot be costed (spec 18).
+    reader_input_tokens: int = 0
+    reader_output_tokens: int = 0
     duration_s: float = 0.0
     doc_sha256: str = ""
     classifier: str = ""
@@ -250,6 +254,8 @@ def run_candidate(
             rules_fired=sorted(set(rules_fired)),
             input_tokens=phase_result.input_tokens,
             output_tokens=phase_result.output_tokens,
+            reader_input_tokens=getattr(phase_result, "reader_input_tokens", 0),
+            reader_output_tokens=getattr(phase_result, "reader_output_tokens", 0),
             duration_s=round(duration, 3),
             doc_sha256=doc.sha256,
             classifier=getattr(active_guard, "name", type(active_guard).__name__),
@@ -352,7 +358,7 @@ def _phased(
     except ReaderFailed:
         _review(ctx, router, reason="reader_failed")
         return PhaseResultLike("review", totals)
-    totals.add(used_in, used_out)
+    totals.add(used_in, used_out, reader=True)
     _trust_portfolio_url(ctx, profile, cfg)
 
     # --- score ---------------------------------------------------------------
@@ -428,10 +434,15 @@ def _phased(
 class PhaseTotals:
     input_tokens: int = 0
     output_tokens: int = 0
+    reader_input_tokens: int = 0
+    reader_output_tokens: int = 0
 
-    def add(self, used_in: int, used_out: int) -> None:
+    def add(self, used_in: int, used_out: int, *, reader: bool = False) -> None:
         self.input_tokens += used_in
         self.output_tokens += used_out
+        if reader:
+            self.reader_input_tokens += used_in
+            self.reader_output_tokens += used_out
 
 
 @dataclass
@@ -446,3 +457,11 @@ class PhaseResultLike:
     @property
     def output_tokens(self) -> int:
         return self.totals.output_tokens
+
+    @property
+    def reader_input_tokens(self) -> int:
+        return self.totals.reader_input_tokens
+
+    @property
+    def reader_output_tokens(self) -> int:
+        return self.totals.reader_output_tokens

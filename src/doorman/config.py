@@ -100,7 +100,10 @@ class Settings:
     """
 
     agent_model: str = "claude-sonnet-5"
-    reader_model: str = "claude-haiku-4-5-20251001"
+    # No date suffix: the current API reference lists this ID bare and rejects a
+    # dated variant. Spec 6 wrote it as `claude-haiku-4-5-20251001`; the ID was
+    # confirmed at the Phase 4 gate, before the first full paid matrix.
+    reader_model: str = "claude-haiku-4-5"
 
     # Recorded in REPORT.md but NOT sent to the API: sampling parameters were
     # removed on the Claude 5 family and a request carrying one returns a 400.

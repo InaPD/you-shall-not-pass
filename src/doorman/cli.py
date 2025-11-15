@@ -1,8 +1,7 @@
 """Doorman CLI (spec 23).
 
-Phase 0 wires up the full command surface so the shape of the tool is fixed early;
-each command raises until its phase lands. The phase is named in the error so an
-unimplemented path is never mistaken for a bug.
+The full command surface was wired up in Phase 0 and each command was filled in
+by the phase that owned it. Every one of them is now implemented.
 """
 
 from __future__ import annotations
@@ -26,9 +25,13 @@ app.add_typer(benign_app, name="benign")
 
 _APPROVAL_MODES = ("auto", "deny", "human")
 
+# Spec 18 caps concurrency at 4; the matrix runner enforces it, this is just the
+# default the CLI asks for.
+DEFAULT_CONCURRENCY = 4
 
-def _todo(what: str, phase: str) -> None:
-    raise NotImplementedError(f"{what} lands in {phase}; see PLAN.md")
+
+def _split(value: str) -> list[str]:
+    return [item.strip() for item in value.split(",") if item.strip()]
 
 
 def _validate_config_name(name: str) -> str:
@@ -128,22 +131,44 @@ def redteam_run(
         "auto", "--approval", callback=lambda v: _validate_approval(v), help="auto | deny."
     ),
     only: str = typer.Option("", "--only", help="Attack ids or a family name to restrict to."),
+    concurrency: int = typer.Option(
+        DEFAULT_CONCURRENCY, "--concurrency", min=1, help="Runs in flight, capped at 4."
+    ),
 ) -> None:
     """Run the attack matrix."""
     from harness import run_matrix
 
-    names = [n.strip() for n in configs.split(",") if n.strip()]
-    only_ids = [n.strip() for n in only.split(",") if n.strip()] or None
     path = run_matrix.run(
-        configs=names, repeats=repeats, only=only_ids, approval=approval
+        configs=_split(configs), corpus="attacks", repeats=repeats,
+        only=_split(only) or None, approval=approval, concurrency=concurrency,
     )
     typer.echo(f"results appended to {path}")
 
 
 @benign_app.command("build")
-def benign_build() -> None:
-    """Generate and render the 100 benign resumes."""
-    _todo("benign build", "Phase 4")
+def benign_build(
+    only: str = typer.Option("", "--only", help="Benign ids to restrict to."),
+) -> None:
+    """Generate and render the 100 benign resumes.
+
+    Cached: a profile already in `corpus/benign/out/` is reused, so rerunning
+    this costs nothing and, more to the point, does not change the corpus a
+    report was measured against.
+    """
+    import anthropic
+    from corpus.benign import generate
+
+    settings = config.load_settings()
+    specs = generate.load_specs()
+    wanted = set(_split(only))
+    if wanted:
+        specs = [s for s in specs if s.id in wanted]
+    client = anthropic.Anthropic()
+    cached = sum(1 for spec in specs if generate.profile_path(spec).is_file())
+    typer.echo(f"{len(specs)} spec(s), {cached} already generated")
+    for spec, path in generate.build_all(client, model=settings.reader_model, specs=specs):
+        mark = "hard" if spec.is_hard_negative else "    "
+        typer.echo(f"{spec.id:<9} {mark} {spec.layout:<14} {path}")
 
 
 @benign_app.command("run")
@@ -151,9 +176,24 @@ def benign_run(
     configs: str = typer.Option(
         ..., "--configs", callback=lambda v: _validate_configs(v), help="Comma-separated presets."
     ),
+    repeats: int = typer.Option(1, "--repeats", min=1, help="Repeats per (config, item)."),
+    only: str = typer.Option("", "--only", help="Benign ids, `benign` or `hard_negative`."),
+    concurrency: int = typer.Option(
+        DEFAULT_CONCURRENCY, "--concurrency", min=1, help="Runs in flight, capped at 4."
+    ),
 ) -> None:
-    """Run the benign matrix for false-positive metrics."""
-    _todo("benign run", "Phase 4")
+    """Run the benign matrix for false-positive metrics.
+
+    Always `--approval auto`: a held approval is the design working, so denying
+    them would turn every irreversible action into a false positive.
+    """
+    from harness import run_matrix
+
+    path = run_matrix.run(
+        configs=_split(configs), corpus="benign", repeats=repeats,
+        only=_split(only) or None, approval="auto", concurrency=concurrency,
+    )
+    typer.echo(f"results appended to {path}")
 
 
 @app.command()

@@ -143,6 +143,9 @@ def _body(document: Any, profile: dict[str, Any]) -> None:
                 f"{item['degree']} in {item['field']}, {item['institution']}"
                 f" ({item.get('year', 'n/a')})"
             )
+    if profile.get("languages"):
+        document.add_heading("Languages", level=1)
+        document.add_paragraph(", ".join(profile["languages"]))
 
 
 def render(
@@ -150,7 +153,13 @@ def render(
     out_path: Path,
     *,
     injection: DocxInjection | None = None,
+    comment: str | None = None,
+    footer: str | None = None,
 ) -> Path:
+    """Render `profile`. `injection` carries an attack; `comment` and `footer` are
+    the benign uses of the same carriers - a careers-service note and a small
+    footer are things real resumes have, and a hidden-channel rule has to live
+    with that."""
     out_path = Path(out_path)
     out_path.parent.mkdir(parents=True, exist_ok=True)
     document = docx.Document()
@@ -158,6 +167,13 @@ def render(
     document.core_properties.title = "Resume"
 
     _body(document, profile)
+    if footer:
+        paragraph = document.sections[0].footer.paragraphs[0]
+        paragraph.text = footer
+        for run in paragraph.runs:
+            run.font.size = Pt(8)
+    if comment:
+        _add_comment_part(document, comment)
 
     if injection is not None:
         place, payload = injection.placement, injection.payload

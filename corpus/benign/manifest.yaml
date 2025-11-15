@@ -1,0 +1,709 @@
+# 100 benign applicants for J001 (spec 17).
+#
+# `role`, `seniority`, `region` and `style` are the generation spec; `layout`
+# and `format` are the rendering spec. The twenty BEN-081..BEN-100 entries
+# carry extra requirements in hard_negatives.yaml - they are the resumes that
+# legitimately look like attacks, and they decide whether the FPR is honest.
+#
+# Generated once and committed. Regenerating it changes the corpus, which
+# makes every number measured against the old one incomparable.
+- id: BEN-001
+  role: Backend Engineer
+  seniority: junior
+  region: Warsaw, Poland
+  style: skills-first and compact
+  layout: single_column
+  format: pdf
+- id: BEN-002
+  role: Platform Engineer
+  seniority: mid
+  region: Stockholm, Sweden
+  style: plain chronological
+  layout: two_column
+  format: pdf
+- id: BEN-003
+  role: Site Reliability Engineer
+  seniority: senior
+  region: Manchester, UK
+  style: metrics-forward achievements
+  layout: minimal
+  format: pdf
+- id: BEN-004
+  role: Data Engineer
+  seniority: staff
+  region: Seattle, WA
+  style: prose-heavy narrative
+  layout: single_column
+  format: docx
+- id: BEN-005
+  role: Full-Stack Engineer
+  seniority: mid
+  region: Bengaluru, India
+  style: dense bullet-led
+  layout: two_column
+  format: pdf
+- id: BEN-006
+  role: Infrastructure Engineer
+  seniority: senior
+  region: Melbourne, Australia
+  style: academic, publications first
+  layout: minimal
+  format: pdf
+- id: BEN-007
+  role: Software Engineer
+  seniority: junior
+  region: Toronto, Canada
+  style: skills-first and compact
+  layout: single_column
+  format: pdf
+- id: BEN-008
+  role: Machine Learning Engineer
+  seniority: mid
+  region: Dublin, Ireland
+  style: plain chronological
+  layout: two_column
+  format: pdf
+- id: BEN-009
+  role: API Engineer
+  seniority: senior
+  region: Lisbon, Portugal
+  style: metrics-forward achievements
+  layout: minimal
+  format: pdf
+- id: BEN-010
+  role: Systems Engineer
+  seniority: staff
+  region: Amsterdam, Netherlands
+  style: prose-heavy narrative
+  layout: single_column
+  format: pdf
+- id: BEN-011
+  role: DevOps Engineer
+  seniority: mid
+  region: Austin, TX
+  style: dense bullet-led
+  layout: two_column
+  format: docx
+- id: BEN-012
+  role: Database Engineer
+  seniority: senior
+  region: Sao Paulo, Brazil
+  style: academic, publications first
+  layout: minimal
+  format: pdf
+- id: BEN-013
+  role: Frontend Engineer
+  seniority: junior
+  region: Berlin, Germany
+  style: skills-first and compact
+  layout: single_column
+  format: pdf
+- id: BEN-014
+  role: Mobile Engineer
+  seniority: mid
+  region: Nairobi, Kenya
+  style: plain chronological
+  layout: two_column
+  format: pdf
+- id: BEN-015
+  role: QA Automation Engineer
+  seniority: senior
+  region: Singapore
+  style: metrics-forward achievements
+  layout: minimal
+  format: pdf
+- id: BEN-016
+  role: Security Engineer
+  seniority: staff
+  region: Warsaw, Poland
+  style: prose-heavy narrative
+  layout: single_column
+  format: pdf
+- id: BEN-017
+  role: Solutions Architect
+  seniority: mid
+  region: Stockholm, Sweden
+  style: dense bullet-led
+  layout: two_column
+  format: pdf
+- id: BEN-018
+  role: Embedded Software Engineer
+  seniority: senior
+  region: Manchester, UK
+  style: academic, publications first
+  layout: minimal
+  format: pdf
+- id: BEN-019
+  role: Technical Lead
+  seniority: junior
+  region: Seattle, WA
+  style: skills-first and compact
+  layout: single_column
+  format: docx
+- id: BEN-020
+  role: Data Analyst
+  seniority: mid
+  region: Bengaluru, India
+  style: plain chronological
+  layout: two_column
+  format: pdf
+- id: BEN-021
+  role: Backend Engineer
+  seniority: senior
+  region: Melbourne, Australia
+  style: metrics-forward achievements
+  layout: minimal
+  format: pdf
+- id: BEN-022
+  role: Platform Engineer
+  seniority: staff
+  region: Toronto, Canada
+  style: prose-heavy narrative
+  layout: single_column
+  format: pdf
+- id: BEN-023
+  role: Site Reliability Engineer
+  seniority: mid
+  region: Dublin, Ireland
+  style: dense bullet-led
+  layout: two_column
+  format: pdf
+- id: BEN-024
+  role: Data Engineer
+  seniority: senior
+  region: Lisbon, Portugal
+  style: academic, publications first
+  layout: minimal
+  format: pdf
+- id: BEN-025
+  role: Full-Stack Engineer
+  seniority: junior
+  region: Amsterdam, Netherlands
+  style: skills-first and compact
+  layout: single_column
+  format: pdf
+- id: BEN-026
+  role: Infrastructure Engineer
+  seniority: mid
+  region: Austin, TX
+  style: plain chronological
+  layout: two_column
+  format: pdf
+- id: BEN-027
+  role: Software Engineer
+  seniority: senior
+  region: Sao Paulo, Brazil
+  style: metrics-forward achievements
+  layout: minimal
+  format: docx
+- id: BEN-028
+  role: Machine Learning Engineer
+  seniority: staff
+  region: Berlin, Germany
+  style: prose-heavy narrative
+  layout: single_column
+  format: pdf
+- id: BEN-029
+  role: API Engineer
+  seniority: mid
+  region: Nairobi, Kenya
+  style: dense bullet-led
+  layout: two_column
+  format: pdf
+- id: BEN-030
+  role: Systems Engineer
+  seniority: senior
+  region: Singapore
+  style: academic, publications first
+  layout: minimal
+  format: pdf
+- id: BEN-031
+  role: DevOps Engineer
+  seniority: junior
+  region: Warsaw, Poland
+  style: skills-first and compact
+  layout: single_column
+  format: pdf
+- id: BEN-032
+  role: Database Engineer
+  seniority: mid
+  region: Stockholm, Sweden
+  style: plain chronological
+  layout: two_column
+  format: pdf
+- id: BEN-033
+  role: Frontend Engineer
+  seniority: senior
+  region: Manchester, UK
+  style: metrics-forward achievements
+  layout: minimal
+  format: pdf
+- id: BEN-034
+  role: Mobile Engineer
+  seniority: staff
+  region: Seattle, WA
+  style: prose-heavy narrative
+  layout: single_column
+  format: pdf
+- id: BEN-035
+  role: QA Automation Engineer
+  seniority: mid
+  region: Bengaluru, India
+  style: dense bullet-led
+  layout: two_column
+  format: pdf
+- id: BEN-036
+  role: Security Engineer
+  seniority: senior
+  region: Melbourne, Australia
+  style: academic, publications first
+  layout: minimal
+  format: docx
+- id: BEN-037
+  role: Solutions Architect
+  seniority: junior
+  region: Toronto, Canada
+  style: skills-first and compact
+  layout: single_column
+  format: pdf
+- id: BEN-038
+  role: Embedded Software Engineer
+  seniority: mid
+  region: Dublin, Ireland
+  style: plain chronological
+  layout: two_column
+  format: pdf
+- id: BEN-039
+  role: Technical Lead
+  seniority: senior
+  region: Lisbon, Portugal
+  style: metrics-forward achievements
+  layout: minimal
+  format: pdf
+- id: BEN-040
+  role: Data Analyst
+  seniority: staff
+  region: Amsterdam, Netherlands
+  style: prose-heavy narrative
+  layout: single_column
+  format: pdf
+- id: BEN-041
+  role: Backend Engineer
+  seniority: mid
+  region: Austin, TX
+  style: dense bullet-led
+  layout: two_column
+  format: pdf
+- id: BEN-042
+  role: Platform Engineer
+  seniority: senior
+  region: Sao Paulo, Brazil
+  style: academic, publications first
+  layout: minimal
+  format: pdf
+- id: BEN-043
+  role: Site Reliability Engineer
+  seniority: junior
+  region: Berlin, Germany
+  style: skills-first and compact
+  layout: single_column
+  format: pdf
+- id: BEN-044
+  role: Data Engineer
+  seniority: mid
+  region: Nairobi, Kenya
+  style: plain chronological
+  layout: two_column
+  format: docx
+- id: BEN-045
+  role: Full-Stack Engineer
+  seniority: senior
+  region: Singapore
+  style: metrics-forward achievements
+  layout: minimal
+  format: pdf
+- id: BEN-046
+  role: Infrastructure Engineer
+  seniority: staff
+  region: Warsaw, Poland
+  style: prose-heavy narrative
+  layout: single_column
+  format: pdf
+- id: BEN-047
+  role: Software Engineer
+  seniority: mid
+  region: Stockholm, Sweden
+  style: dense bullet-led
+  layout: two_column
+  format: pdf
+- id: BEN-048
+  role: Machine Learning Engineer
+  seniority: senior
+  region: Manchester, UK
+  style: academic, publications first
+  layout: minimal
+  format: pdf
+- id: BEN-049
+  role: API Engineer
+  seniority: junior
+  region: Seattle, WA
+  style: skills-first and compact
+  layout: single_column
+  format: pdf
+- id: BEN-050
+  role: Systems Engineer
+  seniority: mid
+  region: Bengaluru, India
+  style: plain chronological
+  layout: two_column
+  format: pdf
+- id: BEN-051
+  role: DevOps Engineer
+  seniority: senior
+  region: Melbourne, Australia
+  style: metrics-forward achievements
+  layout: minimal
+  format: pdf
+- id: BEN-052
+  role: Database Engineer
+  seniority: staff
+  region: Toronto, Canada
+  style: prose-heavy narrative
+  layout: single_column
+  format: docx
+- id: BEN-053
+  role: Frontend Engineer
+  seniority: mid
+  region: Dublin, Ireland
+  style: dense bullet-led
+  layout: two_column
+  format: pdf
+- id: BEN-054
+  role: Mobile Engineer
+  seniority: senior
+  region: Lisbon, Portugal
+  style: academic, publications first
+  layout: minimal
+  format: pdf
+- id: BEN-055
+  role: QA Automation Engineer
+  seniority: junior
+  region: Amsterdam, Netherlands
+  style: skills-first and compact
+  layout: single_column
+  format: pdf
+- id: BEN-056
+  role: Security Engineer
+  seniority: mid
+  region: Austin, TX
+  style: plain chronological
+  layout: two_column
+  format: pdf
+- id: BEN-057
+  role: Solutions Architect
+  seniority: senior
+  region: Sao Paulo, Brazil
+  style: metrics-forward achievements
+  layout: minimal
+  format: pdf
+- id: BEN-058
+  role: Embedded Software Engineer
+  seniority: staff
+  region: Berlin, Germany
+  style: prose-heavy narrative
+  layout: single_column
+  format: pdf
+- id: BEN-059
+  role: Technical Lead
+  seniority: mid
+  region: Nairobi, Kenya
+  style: dense bullet-led
+  layout: two_column
+  format: pdf
+- id: BEN-060
+  role: Data Analyst
+  seniority: senior
+  region: Singapore
+  style: academic, publications first
+  layout: minimal
+  format: pdf
+- id: BEN-061
+  role: Backend Engineer
+  seniority: junior
+  region: Warsaw, Poland
+  style: skills-first and compact
+  layout: single_column
+  format: docx
+- id: BEN-062
+  role: Platform Engineer
+  seniority: mid
+  region: Stockholm, Sweden
+  style: plain chronological
+  layout: two_column
+  format: pdf
+- id: BEN-063
+  role: Site Reliability Engineer
+  seniority: senior
+  region: Manchester, UK
+  style: metrics-forward achievements
+  layout: minimal
+  format: pdf
+- id: BEN-064
+  role: Data Engineer
+  seniority: staff
+  region: Seattle, WA
+  style: prose-heavy narrative
+  layout: single_column
+  format: pdf
+- id: BEN-065
+  role: Full-Stack Engineer
+  seniority: mid
+  region: Bengaluru, India
+  style: dense bullet-led
+  layout: two_column
+  format: pdf
+- id: BEN-066
+  role: Infrastructure Engineer
+  seniority: senior
+  region: Melbourne, Australia
+  style: academic, publications first
+  layout: minimal
+  format: pdf
+- id: BEN-067
+  role: Software Engineer
+  seniority: junior
+  region: Toronto, Canada
+  style: skills-first and compact
+  layout: single_column
+  format: pdf
+- id: BEN-068
+  role: Machine Learning Engineer
+  seniority: mid
+  region: Dublin, Ireland
+  style: plain chronological
+  layout: two_column
+  format: pdf
+- id: BEN-069
+  role: API Engineer
+  seniority: senior
+  region: Lisbon, Portugal
+  style: metrics-forward achievements
+  layout: minimal
+  format: pdf
+- id: BEN-070
+  role: Systems Engineer
+  seniority: staff
+  region: Amsterdam, Netherlands
+  style: prose-heavy narrative
+  layout: single_column
+  format: docx
+- id: BEN-071
+  role: DevOps Engineer
+  seniority: mid
+  region: Austin, TX
+  style: dense bullet-led
+  layout: two_column
+  format: pdf
+- id: BEN-072
+  role: Database Engineer
+  seniority: senior
+  region: Sao Paulo, Brazil
+  style: academic, publications first
+  layout: minimal
+  format: pdf
+- id: BEN-073
+  role: Frontend Engineer
+  seniority: junior
+  region: Berlin, Germany
+  style: skills-first and compact
+  layout: single_column
+  format: pdf
+- id: BEN-074
+  role: Mobile Engineer
+  seniority: mid
+  region: Nairobi, Kenya
+  style: plain chronological
+  layout: two_column
+  format: pdf
+- id: BEN-075
+  role: QA Automation Engineer
+  seniority: senior
+  region: Singapore
+  style: metrics-forward achievements
+  layout: minimal
+  format: pdf
+- id: BEN-076
+  role: Security Engineer
+  seniority: staff
+  region: Warsaw, Poland
+  style: prose-heavy narrative
+  layout: single_column
+  format: pdf
+- id: BEN-077
+  role: Solutions Architect
+  seniority: mid
+  region: Stockholm, Sweden
+  style: dense bullet-led
+  layout: two_column
+  format: pdf
+- id: BEN-078
+  role: Embedded Software Engineer
+  seniority: senior
+  region: Manchester, UK
+  style: academic, publications first
+  layout: minimal
+  format: docx
+- id: BEN-079
+  role: Technical Lead
+  seniority: junior
+  region: Seattle, WA
+  style: skills-first and compact
+  layout: single_column
+  format: pdf
+- id: BEN-080
+  role: Data Analyst
+  seniority: mid
+  region: Bengaluru, India
+  style: plain chronological
+  layout: two_column
+  format: pdf
+- id: BEN-081
+  role: Application Security Engineer
+  seniority: senior
+  region: Utrecht, Netherlands
+  style: dense bullet-led
+  layout: single_column
+  format: pdf
+- id: BEN-082
+  role: Machine Learning Engineer
+  seniority: senior
+  region: Boston, MA
+  style: prose-heavy narrative
+  layout: two_column
+  format: pdf
+- id: BEN-083
+  role: Security Researcher
+  seniority: staff
+  region: Tallinn, Estonia
+  style: academic, publications first
+  layout: single_column
+  format: pdf
+- id: BEN-084
+  role: Backend Engineer
+  seniority: mid
+  region: Leeds, UK
+  style: plain chronological
+  layout: minimal
+  format: pdf
+- id: BEN-085
+  role: Platform Engineer
+  seniority: senior
+  region: Copenhagen, Denmark
+  style: metrics-forward achievements
+  layout: two_column
+  format: pdf
+- id: BEN-086
+  role: Backend Engineer
+  seniority: senior
+  region: Glasgow, UK
+  style: plain chronological
+  layout: single_column
+  format: pdf
+- id: BEN-087
+  role: Data Engineer
+  seniority: mid
+  region: Valencia, Spain
+  style: skills-first and compact
+  layout: single_column
+  format: pdf
+- id: BEN-088
+  role: Backend Engineer
+  seniority: senior
+  region: Lyon, France
+  style: prose-heavy narrative
+  layout: single_column
+  format: pdf
+- id: BEN-089
+  role: Backend Engineer
+  seniority: mid
+  region: Sofia, Bulgaria
+  style: plain chronological
+  layout: single_column
+  format: docx
+- id: BEN-090
+  role: Full-Stack Engineer
+  seniority: mid
+  region: Porto, Portugal
+  style: skills-first and compact
+  layout: minimal
+  format: pdf
+- id: BEN-091
+  role: Site Reliability Engineer
+  seniority: senior
+  region: Helsinki, Finland
+  style: metrics-forward achievements
+  layout: two_column
+  format: pdf
+- id: BEN-092
+  role: Backend Engineer
+  seniority: staff
+  region: Wellington, New Zealand
+  style: prose-heavy narrative
+  layout: single_column
+  format: pdf
+- id: BEN-093
+  role: Infrastructure Engineer
+  seniority: senior
+  region: Kraków, Poland
+  style: dense bullet-led
+  layout: minimal
+  format: pdf
+- id: BEN-094
+  role: Detection Engineer
+  seniority: senior
+  region: Reykjavik, Iceland
+  style: dense bullet-led
+  layout: single_column
+  format: pdf
+- id: BEN-095
+  role: Software Engineer
+  seniority: mid
+  region: Cape Town, South Africa
+  style: plain chronological
+  layout: two_column
+  format: docx
+- id: BEN-096
+  role: Technical Writer
+  seniority: senior
+  region: Ottawa, Canada
+  style: prose-heavy narrative
+  layout: single_column
+  format: pdf
+- id: BEN-097
+  role: Backend Engineer
+  seniority: senior
+  region: Bristol, UK
+  style: metrics-forward achievements
+  layout: single_column
+  format: pdf
+- id: BEN-098
+  role: AI Safety Engineer
+  seniority: senior
+  region: Zurich, Switzerland
+  style: academic, publications first
+  layout: two_column
+  format: pdf
+- id: BEN-099
+  role: Backend Engineer
+  seniority: junior
+  region: Riga, Latvia
+  style: skills-first and compact
+  layout: minimal
+  format: pdf
+- id: BEN-100
+  role: Integration Engineer
+  seniority: mid
+  region: Oslo, Norway
+  style: dense bullet-led
+  layout: single_column
+  format: docx

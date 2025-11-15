@@ -57,17 +57,11 @@ def test_unknown_approval_mode_is_rejected(tmp_path):
     assert result.exit_code != 0
 
 
-@pytest.mark.parametrize(
-    "argv,phase",
-    [
-        (["benign", "build"], "Phase 4"),
-        (["benign", "run", "--configs", "full"], "Phase 4"),
-    ],
-)
-def test_unimplemented_commands_raise_and_name_their_phase(argv, phase):
-    result = runner.invoke(app, argv)
-    assert isinstance(result.exception, NotImplementedError)
-    assert phase in str(result.exception)
+def test_every_command_is_implemented():
+    """Phase 0 shipped the whole command surface as stubs. Nothing may still be
+    one: an unimplemented command is a hole in the CLI, not a placeholder."""
+    source = Path(__file__).parents[1] / "src" / "doorman" / "cli.py"
+    assert "NotImplementedError" not in source.read_text(encoding="utf-8")
 
 
 def test_ingest_reports_rules_on_a_real_attack_file():
@@ -87,18 +81,27 @@ def test_approve_rejects_an_unknown_run():
     assert "no run at" in result.output
 
 
-def test_redteam_run_is_never_invoked_without_a_fake_client():
-    """A guard, not a behaviour test: `doorman redteam run` builds a real client
-    and executes the whole matrix, writing into harness/out/ and runs/. No test
-    may call it - drive harness.run_matrix.run(client_factory=...) instead."""
+@pytest.mark.parametrize("group", ["redteam", "benign"])
+def test_the_matrix_commands_are_never_invoked_from_a_test(group):
+    """A guard, not a behaviour test.
+
+    `doorman redteam run` and `doorman benign run` build a real client and
+    execute the whole matrix, writing into harness/out/results.jsonl and runs/.
+    A test that calls one pollutes the results file a report is built from, which
+    is how a fabricated number gets into REPORT.md. Drive
+    `harness.run_matrix.run(client_factory=...)` with an explicit results_path
+    instead. The same goes for `benign build`, which spends money on generation.
+    """
     # Built at runtime so this guard does not match its own source. Matches the
     # actual invocation, not the --help parametrize that merely names the pair.
-    needle = "invoke(app, [" + '"redteam", ' + '"run"'
-    offenders = [
+    subcommands = ["run", "build"] if group == "benign" else ["run"]
+    needles = ["invoke(app, [" + f'"{group}", ' + f'"{sub}"' for sub in subcommands]
+    offenders = sorted({
         path.name
         for path in Path(__file__).parent.glob("test_*.py")
+        for needle in needles
         if needle in path.read_text(encoding="utf-8")
-    ]
+    })
     assert not offenders, f"these tests invoke the real matrix: {offenders}"
 
 

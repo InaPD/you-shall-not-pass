@@ -59,7 +59,7 @@ class TestSettings:
             monkeypatch.delenv(key, raising=False)
         settings = config.load_settings(dotenv=False)
         assert settings.agent_model == "claude-sonnet-5"
-        assert settings.reader_model == "claude-haiku-4-5-20251001"
+        assert settings.reader_model == "claude-haiku-4-5"
         assert settings.temperature == 0.0
 
     def test_thresholds_match_the_spec(self, monkeypatch):
