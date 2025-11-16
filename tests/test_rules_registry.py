@@ -14,8 +14,23 @@ FIXTURES = Path(__file__).parent / "fixtures"
 _RULE_ID_KEYS = ("rule_id", "cause_rule_id")
 
 
-def test_registry_is_not_empty():
-    assert len(rules.RULES) == 30
+# The rule set is fixed by the spec. A rule may only be added by a documented
+# bypass fix, which is why the extras are named here rather than the count being
+# bumped: an unexplained rule in the registry is a rule nobody can account for.
+SPEC_RULES = 30
+BYPASS_FIX_RULES = {"OUT-006"}  # BYP-001, docs/BYPASSES.md
+
+
+def test_registry_holds_the_spec_rules_plus_named_bypass_fixes():
+    assert len(rules.RULES) == SPEC_RULES + len(BYPASS_FIX_RULES)
+    assert set(rules.RULES) >= BYPASS_FIX_RULES
+
+
+def test_every_added_rule_is_documented_as_a_bypass_fix():
+    doc = Path(__file__).parents[1] / "docs" / "BYPASSES.md"
+    body = doc.read_text(encoding="utf-8")
+    for rule_id in BYPASS_FIX_RULES:
+        assert rule_id in body, f"{rule_id} is in the registry but not in BYPASSES.md"
 
 
 def test_every_rule_id_matches_its_layer():

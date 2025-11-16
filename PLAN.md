@@ -267,6 +267,12 @@ to run, a real log excerpt showing rule IDs) and `docs/THREAT_MODEL.md`.
 **Gate:** `BYPASSES.md` has one complete entry; the regression attack fails against `full`;
 README renders the final tables.
 
+**Gate status:** the first two are met - BYP-001 is documented, and `BYP-001`/`BYP-002` land
+against `none` and are denied by OUT-006 under `full`. The third is mechanically in place but
+empty: the README's results block is generated from `summary.json` and currently says that no
+matrix has been run, because none has (the Phase 4 budget gate is still open). It fills itself
+the first time `doorman report` runs over a real sweep.
+
 **Watch for:** spec §21.9 forbids pre-solving this - no span-level provenance in the reader before
 this phase. Resist adding it in Phase 2 even when it is obviously the fix. The value of this phase
 is the documented discovery, not the feature.
@@ -365,6 +371,58 @@ is the documented discovery, not the feature.
     pushed every later line of the main column onto the next page, beside nothing. The
     columns are now recorded per page and replayed together. The identical-words check
     would never have caught this - the words are all still there, in the wrong place.
+
+## Findings from Phase 5
+
+1. **The bypass was one character class wide.** `OUT-002` denies any URL whose
+   host is not trusted, and its pattern required `https?://`. Deleting the scheme
+   deleted the rule: the identical attack went from denied to delivered. The rule
+   tested how a URL is written rather than whether a reader would follow it.
+   Closed by OUT-006; documented as BYP-001 with `BYP-001`/`BYP-002` in the
+   manifest.
+2. **The residuals matter more than the fix.** Four more evasions of the same
+   layer were reproduced in the same sitting - an obfuscated address, a link
+   under an excluded TLD, a phone callback, a canary split by whitespace, a
+   partial name. They all have BYP-001's shape: every OUT rule matches an exact
+   written form and free text always has another form. The honest conclusion is
+   in BYPASSES.md rather than a longer list of patches: the output scanner raises
+   the cost of `personal_note`, it does not close it.
+3. **What counts as a link had to become configuration.** Treating every
+   `word.word` as a host denies `Node.js`, `deploy.sh` and `README.md` in an
+   ordinary screening rationale - OUT-* runs on `rationale`, not just on the
+   outbound note. `config/link_tlds.yaml` draws that line as data and leaves the
+   rule's blind spot explicit (TLDs colliding with file extensions are excluded
+   on purpose) instead of emergent.
+4. **The thesis number holds at 72 attacks and is now pinned by a test.**
+   CLS-101 fires on 0 of 72, CLS-102 on 5 - the five `forged_structure` attacks
+   that literally contain `SYSTEM:`. The README leads with it, so a test fails if
+   a payload or a regex ever changes it. Measuring it needs the *built documents*:
+   scanning the payload files alone reports 0 for CLS-102, because the forged
+   marker is added by the generator, not the payload.
+5. **An added rule has to be accountable.** `test_rules_registry.py` pinned the
+   count at 30. Rather than bump it to 31, the test now asserts "the spec's 30
+   plus explicitly named bypass fixes", and a second test requires every named
+   extra to appear in BYPASSES.md. A rule nobody can account for is how a
+   registry stops being a source of truth.
+6. **The README's results section is generated, never typed.** `doorman report`
+   rewrites the block between two markers from `summary.json`. Until a matrix has
+   run it says so in as many words. Hand-typed tables in a README outlive the run
+   that produced them and cannot be checked.
+7. **The same mistake as Phase 4, on a different file.** The first version of
+   that generator was called from `report.build()` with no path parameter, so
+   every test that built a report rewrote the *project* README with numbers from
+   a three-row fixture - and the README in the working tree was carrying them.
+   Phase 4 finding 2 was a test writing into `results.jsonl`; this was a test
+   writing into `README.md`. The shape is identical: a convenience default
+   pointing at a real artefact. `readme_path` now defaults to `None` and only
+   `doorman report` passes it, with a test asserting the suite leaves the README
+   byte-identical. Worth stating twice because it was not learned the first time.
+8. **A rule that reads outbound prose meets the resume it came from.** OUT-006
+   denied `ASP.NET`, because `net` is a real TLD and `ASP.NET` is a real thing to
+   write in a screening note. Dropping `net` from the list would have traded one
+   false positive for blindness to every `.net` address, so the fix is a short
+   `not_links` allowlist instead. The benign corpus should have caught this and
+   could not: no benign applicant writes .NET. One now does.
 
 ## Standing constraints
 

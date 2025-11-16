@@ -491,3 +491,53 @@ class TestErroredRunsAreNotSecurityOutcomes:
         assert "model exploded" in row["error"]
         assert "reached" not in row and "executed" not in row
         assert row["aborted"] is True
+
+
+class TestReadmeResults:
+    """The README's results section is generated from summary.json (spec 20, M5)."""
+
+    def test_build_fills_the_block_when_given_a_readme(self, tmp_path, benign_sweep):
+        readme = tmp_path / "README.md"
+        readme.write_text(
+            f"# Doorman\n\n{report.RESULTS_START}\nstale\n{report.RESULTS_END}\n\n## Next\n"
+        )
+        report.build(results_path=benign_sweep, report_path=tmp_path / "R.md",
+                     summary_path=tmp_path / "s.json", readme_path=readme)
+        body = readme.read_text()
+        assert "stale" not in body
+        assert "False positives" in body
+        assert body.startswith("# Doorman") and body.rstrip().endswith("## Next")
+
+    def test_it_says_so_rather_than_inventing_numbers(self, tmp_path):
+        readme = tmp_path / "README.md"
+        readme.write_text(f"{report.RESULTS_START}\n{report.RESULTS_END}\n")
+        report.update_readme({"runs": 0}, readme_path=readme)
+        assert "No matrix has been run yet" in readme.read_text()
+
+    def test_the_hard_negative_count_is_derived_not_asserted(self, tmp_path,
+                                                             benign_sweep):
+        """A sentence naming 100 applicants would read as true above a table
+        built from three."""
+        report.build(results_path=benign_sweep, report_path=tmp_path / "R.md",
+                     summary_path=tmp_path / "s.json")
+        summary = json.loads((tmp_path / "s.json").read_text())
+        block = "\n".join(report.readme_tables(summary))
+        expected = max(e["hard_negative_n"] for e in summary["fpr"].values())
+        assert "100 applicants" not in block
+        assert f"{expected} of them hard negatives" in block
+        assert expected == 2, "the sweep covers BEN-084 and BEN-089"
+
+    def test_a_readme_without_markers_is_left_alone(self, tmp_path):
+        readme = tmp_path / "README.md"
+        readme.write_text("# Doorman\n\nno markers here\n")
+        assert report.update_readme({"runs": 0}, readme_path=readme) is None
+        assert readme.read_text() == "# Doorman\n\nno markers here\n"
+
+
+    def test_build_leaves_the_readme_alone_unless_asked(self, tmp_path, benign_sweep):
+        """The default is no side effect. Only `doorman report` opts in."""
+        readme = tmp_path / "README.md"
+        readme.write_text(f"{report.RESULTS_START}\nuntouched\n{report.RESULTS_END}\n")
+        report.build(results_path=benign_sweep, report_path=tmp_path / "R.md",
+                     summary_path=tmp_path / "s.json")
+        assert "untouched" in readme.read_text()

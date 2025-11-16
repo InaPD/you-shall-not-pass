@@ -18,6 +18,10 @@ REPORT_PATH = Path(__file__).resolve().parents[1] / "REPORT.md"
 
 ALL_ROW = "all attacks"
 
+README_PATH = Path(__file__).resolve().parents[1] / "README.md"
+RESULTS_START = "<!-- results:start -->"
+RESULTS_END = "<!-- results:end -->"
+
 # `score_drift` and decision agreement are defined against the undefended run
 # (spec 17): the question is whether the defences changed the recommendation an
 # ordinary applicant would otherwise have received.
@@ -282,6 +286,85 @@ def ablation_paragraph(summary: dict, configs: list[str]) -> str:
     return " ".join(parts) or "_Not enough data for an ablation summary._"
 
 
+def readme_tables(summary: dict[str, Any]) -> list[str]:
+    """The headline numbers, for the README (spec 20, M5).
+
+    Generated from summary.json rather than typed, so the README cannot drift
+    from the data - and cannot carry numbers before there are any.
+    """
+    asr = summary.get("asr") or {}
+    fpr = summary.get("fpr") or {}
+    configs = summary.get("configs") or []
+    if not summary.get("runs"):
+        return [
+            "_No matrix has been run yet. `doorman report` writes this section "
+            "from `harness/out/summary.json`; until then there are no numbers to "
+            "show, and typing any in by hand would be inventing them._",
+        ]
+
+    lines = [
+        f"Generated from `harness/out/summary.json` at {summary.get('generated', '?')}"
+        f" (commit `{summary.get('commit', '?')}`).",
+        "",
+        f"**Attack success rate** - {summary.get('attack_runs', 0)} runs, "
+        "`executed% (reached%)` over the whole corpus.",
+        "",
+        "| config | " + " | ".join(f"`{c}`" for c in configs) + " |",
+        "|---" * (len(configs) + 1) + "|",
+    ]
+    overall = asr.get(ALL_ROW, {})
+    cells = []
+    for config in configs:
+        entry = overall.get(config) or {}
+        executed, reached, n = (
+            entry.get("executed_pct"), entry.get("reached_pct"), entry.get("n")
+        )
+        cells.append("-" if not n else f"{executed:.0f}% ({reached:.0f}%) n={n}")
+    lines.append("| all attacks | " + " | ".join(cells) + " |")
+
+    if fpr:
+        # Derived, never asserted: a sentence claiming "100 applicants, 20 hard
+        # negatives" would still read as true above a table built from three.
+        hard = max((e.get("hard_negative_n") or 0) for e in fpr.values())
+        lines += [
+            "",
+            f"**False positives** - {summary.get('benign_runs', 0)} benign runs, "
+            f"{hard} of them hard negatives.",
+            "",
+            "| config | FP_hard | FP_soft | score_drift | decision agreement |",
+            "|---|---|---|---|---|",
+        ]
+        for config, entry in fpr.items():
+            drift = entry.get("score_drift")
+            agree = entry.get("decision_agreement_pct")
+            lines.append(
+                f"| `{config}` | {entry.get('fp_hard_pct', 0):.0f}% | "
+                f"{entry.get('fp_soft_pct', 0):.0f}% | "
+                + ("-" if drift is None else f"{drift:.2f}")
+                + " | "
+                + ("-" if agree is None else f"{agree:.0f}%")
+                + " |"
+            )
+    return lines
+
+
+def update_readme(
+    summary: dict[str, Any], readme_path: Path = README_PATH
+) -> Path | None:
+    """Rewrite the block between the results markers. No markers, no write."""
+    path = Path(readme_path)
+    if not path.is_file():
+        return None
+    body = path.read_text(encoding="utf-8")
+    if RESULTS_START not in body or RESULTS_END not in body:
+        return None
+    head, _, rest = body.partition(RESULTS_START)
+    _, _, tail = rest.partition(RESULTS_END)
+    block = "\n".join([RESULTS_START, "", *readme_tables(summary), ""])
+    path.write_text(head + block + RESULTS_END + tail, encoding="utf-8")
+    return path
+
+
 def _repeats(rows: list[dict]) -> int:
     return max((int(r.get("rep", 1)) for r in rows), default=0)
 
@@ -298,7 +381,16 @@ def build(
     report_path: Path = REPORT_PATH,
     summary_path: Path = SUMMARY_PATH,
     settings: Settings | None = None,
+    readme_path: Path | None = None,
 ) -> Path:
+    """Write REPORT.md and summary.json. Touches the README only when asked.
+
+    `readme_path` defaults to None rather than to README_PATH deliberately. A
+    default that wrote the project README would mean every test calling
+    `build()` with temporary paths silently rewrote a tracked file with numbers
+    from a three-row fixture - which is how a test result ends up published as a
+    measurement. Only `doorman report` passes it.
+    """
     settings = settings or Settings()
     rows = load_results(results_path)
     errors = [r for r in rows if r.get("error")]
@@ -405,27 +497,24 @@ def build(
 
     Path(report_path).write_text("\n".join(body), encoding="utf-8")
     Path(summary_path).parent.mkdir(parents=True, exist_ok=True)
-    Path(summary_path).write_text(
-        json.dumps(
-            {
-                "generated": datetime.now(UTC).isoformat(timespec="seconds"),
-                "commit": _git_sha(),
-                "agent_model": settings.agent_model,
-                "reader_model": settings.reader_model,
-                "configs": configs,
-                "asr": asr_summary,
-                "fpr": fpr_summary,
-                "rules_fired": rule_summary,
-                "rules_fired_benign": benign_rule_summary,
-                "runs": len(rows),
-                "attack_runs": len(attacks),
-                "benign_runs": len(benign),
-                "errored_runs_excluded": len(errors),
-                "cost_usd": cost,
-                "errors": len(errors),
-            },
-            indent=2,
-        ),
-        encoding="utf-8",
-    )
+    summary = {
+        "generated": datetime.now(UTC).isoformat(timespec="seconds"),
+        "commit": _git_sha(),
+        "agent_model": settings.agent_model,
+        "reader_model": settings.reader_model,
+        "configs": configs,
+        "asr": asr_summary,
+        "fpr": fpr_summary,
+        "rules_fired": rule_summary,
+        "rules_fired_benign": benign_rule_summary,
+        "runs": len(rows),
+        "attack_runs": len(attacks),
+        "benign_runs": len(benign),
+        "errored_runs_excluded": len(errors),
+        "cost_usd": cost,
+        "errors": len(errors),
+    }
+    Path(summary_path).write_text(json.dumps(summary, indent=2), encoding="utf-8")
+    if readme_path is not None:
+        update_readme(summary, readme_path)
     return Path(report_path)

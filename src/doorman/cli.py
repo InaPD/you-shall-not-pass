@@ -285,9 +285,10 @@ def report() -> None:
     """Turn results.jsonl into REPORT.md and summary.json."""
     from harness import report as report_builder
 
-    path = report_builder.build()
+    path = report_builder.build(readme_path=report_builder.README_PATH)
     typer.echo(f"wrote {path}")
     typer.echo(f"wrote {report_builder.SUMMARY_PATH}")
+    typer.echo(f"updated the results section of {report_builder.README_PATH}")
 
 
 @app.command()

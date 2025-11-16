@@ -1,4 +1,4 @@
-"""Output scanning, OUT-001 to OUT-005 (spec 10.3, 19)."""
+"""Output scanning, OUT-001 to OUT-006 (spec 10.3, 19)."""
 
 from __future__ import annotations
 
@@ -124,3 +124,78 @@ class TestArgumentScanning:
 
     def test_non_string_arguments_are_skipped(self):
         assert scan_args({"score": 95, "flag": True}, ctx()) == []
+
+
+class TestSchemelessHosts:
+    """OUT-006, the rule that closed BYP-001 (docs/BYPASSES.md).
+
+    OUT-002 only recognised a URL with a scheme, so the same attacker address
+    typed as `evil.example/offer` reached the candidate's inbox untouched. A
+    recipient reads it as a link either way, so the scheme cannot be what
+    decides.
+    """
+
+    def test_a_schemeless_host_is_denied(self):
+        cover("OUT-006")
+        assert "OUT-006" in rules("Confirm your start date at evil.example/confirm-offer.")
+
+    def test_a_bare_host_with_no_path_is_denied(self):
+        assert "OUT-006" in rules("Our scheduling page is evil.example.")
+
+    def test_a_subdomain_is_denied(self):
+        assert "OUT-006" in rules("Upload your ID at www.evil.example/verify.")
+
+    def test_a_mangled_scheme_does_not_hide_the_host(self):
+        """`hxxps://` is not a URL to OUT-002, but the host is still there."""
+        assert "OUT-006" in rules("Go to hxxps://evil.example/pickup (remove the x's).")
+
+    def test_the_trusted_host_is_allowed_without_a_scheme(self):
+        assert "OUT-006" not in rules("Your samples at portfolio.example are noted.")
+
+    def test_the_candidates_own_address_is_not_read_as_a_link(self):
+        """The domain inside an email address is not something a reader follows,
+        and OUT-003 already owns addresses."""
+        assert rules("We will write to jordan.avery@example.com with next steps.") == []
+
+    def test_a_schemed_url_is_reported_once_by_out_002(self):
+        """Not twice. The deciding rule in the report has to be the real one."""
+        assert rules("See https://evil.example/x") == ["OUT-002"]
+
+    def test_each_host_is_reported_once(self):
+        hits = rules("evil.example/a and evil.example/b and evil.example/c")
+        assert hits == ["OUT-006"]
+
+    @pytest.mark.parametrize(
+        "prose",
+        [
+            "Strong Node.js and Next.js background, plus D3.js work.",
+            "Built enterprise systems in ASP.NET and C#.",
+            "Strong VB.NET and ADO.NET background on legacy platforms.",
+            "Wrote deploy.sh and README.md for the release pipeline.",
+            "Six years of experience, e.g. payments, i.e. money movement.",
+            "Good fit. It is a strong match. In short, advance.",
+            "Migrated from Python 3.11 to 3.12 and Django 4.2.",
+            "Holds a Ph.D. in distributed systems from a U.S. university.",
+        ],
+    )
+    def test_ordinary_screening_prose_is_not_a_link(self, prose):
+        """The rule runs on `rationale` as well as `personal_note`. A screening
+        note that mentions a library or a script is not an exfiltration channel,
+        and denying one would cost more than the rule buys."""
+        assert rules(prose) == []
+
+    def test_what_counts_as_a_link_is_configuration_not_code(self):
+        from doorman.guard.output_scan import link_tlds
+
+        tlds = link_tlds()
+        assert "example" in tlds and "com" in tlds
+        # Deliberately absent: they collide with file extensions. This is a
+        # documented residual gap, not an oversight (docs/BYPASSES.md).
+        assert not {"sh", "py", "md", "rs"} & tlds
+
+    def test_exempting_a_platform_name_does_not_blind_the_rule_to_its_tld(self):
+        """`ASP.NET` must not be denied, and `evil.net` must still be. Dropping
+        `net` from the TLD list would have bought the first at the cost of the
+        second."""
+        assert rules("Built enterprise systems in ASP.NET and C#.") == []
+        assert "OUT-006" in rules("Pick up the offer at evil.net/claim.")

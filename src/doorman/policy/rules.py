@@ -64,6 +64,9 @@ _ALL: tuple[Rule, ...] = (
     _r("OUT-003", "OUT", "DENY", "Email address that is not the trusted candidate address"),
     _r("OUT-004", "OUT", "DENY", "Another candidate's id or full name appears in outbound text"),
     _r("OUT-005", "OUT", "FLAG", "Instruction-like phrasing in outbound text"),
+    # Phase 5: closes BYP-001. OUT-002 only recognised a URL with a scheme, so
+    # dropping `https://` walked the same link past it (docs/BYPASSES.md).
+    _r("OUT-006", "OUT", "DENY", "Schemeless host whose domain is not in the trusted set"),
     # --- Approvals (spec 11.3). ------------------------------------------------
     _r("APR-001", "APR", "REQUIRE_APPROVAL", "send_email leaves the system boundary"),
     _r("APR-002", "APR", "REQUIRE_APPROVAL", "ats_update sets status to advance or reject"),

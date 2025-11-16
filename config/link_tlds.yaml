@@ -1,0 +1,144 @@
+# Top-level domains that OUT-006 treats as making a bare token a link.
+#
+# OUT-002 only sees a URL when it carries a scheme, so `evil.example/offer`
+# reached a candidate's inbox untouched (docs/BYPASSES.md, BYP-001). OUT-006
+# closes that, and this list is what tells a link apart from ordinary text: a
+# token is a link only when its last label is named here.
+#
+# Deliberately NOT a full public-suffix list. Two reasons:
+#   * the alternative is treating every `word.word` as a link, which denies
+#     `Node.js`, `deploy.sh` and `README.md` in an ordinary screening rationale;
+#   * a curated list makes the rule's blind spot explicit and measurable rather
+#     than emergent.
+#
+# TLDs that collide with common file extensions are left OUT on purpose:
+# sh, py, rs, ml, md, pl, cc, so, zip, mov. A link under one of those is a known
+# residual gap, recorded in docs/BYPASSES.md rather than silently accepted.
+#
+# `not_links` is the other half of the same problem. Dropping `net` from the list
+# would blind the rule to every `.net` address to avoid denying `ASP.NET` in a
+# screening note, which is the wrong trade; these exact tokens are excluded
+# instead. They are platform names an engineer writes about their own work, and
+# excluding them is an allowlist decision: an attacker who controls one of these
+# hosts has access most attackers do not.
+not_links:
+  - asp.net
+  - vb.net
+  - ado.net
+  - ext.net
+  - dot.net
+
+tlds:
+  # Reserved for documentation and testing (RFC 2606). The corpora live here.
+  - example
+  - test
+  - invalid
+  - localhost
+  - local
+  # Generic
+  - com
+  - net
+  - org
+  - info
+  - biz
+  - io
+  - co
+  - ai
+  - app
+  - dev
+  - cloud
+  - online
+  - site
+  - tech
+  - xyz
+  - top
+  - club
+  - store
+  - shop
+  - live
+  - space
+  - fun
+  - world
+  - today
+  - news
+  - blog
+  - wiki
+  - link
+  - click
+  - page
+  - email
+  - host
+  - press
+  - systems
+  - solutions
+  - digital
+  - agency
+  - studio
+  - design
+  - media
+  - network
+  - group
+  - team
+  - work
+  - works
+  - zone
+  - city
+  - edu
+  - gov
+  - mil
+  - int
+  # Country code
+  - us
+  - uk
+  - de
+  - fr
+  - es
+  - it
+  - nl
+  - se
+  - no
+  - fi
+  - dk
+  - pt
+  - ru
+  - cn
+  - jp
+  - kr
+  - in
+  - br
+  - ca
+  - au
+  - nz
+  - za
+  - ch
+  - at
+  - be
+  - ie
+  - cz
+  - gr
+  - hu
+  - ro
+  - bg
+  - hr
+  - sk
+  - si
+  - lt
+  - lv
+  - ee
+  - is
+  - mx
+  - ar
+  - cl
+  - eu
+  - tr
+  - ua
+  - il
+  - ae
+  - sg
+  - hk
+  - tw
+  - th
+  - vn
+  - my
+  - id
+  - ph

@@ -133,8 +133,11 @@
   style: academic, publications first
   layout: minimal
   format: pdf
+# A .NET engineer, so the false-positive numbers cover the platform whose name
+# is host-shaped. OUT-006 denied `ASP.NET` until the not_links allowlist landed,
+# and no benign applicant existed who would have shown it (Phase 5, finding 8).
 - id: BEN-019
-  role: Technical Lead
+  role: .NET Backend Engineer
   seniority: junior
   region: Seattle, WA
   style: skills-first and compact
