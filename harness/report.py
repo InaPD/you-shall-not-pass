@@ -395,11 +395,13 @@ def build(
     rows = load_results(results_path)
     errors = [r for r in rows if r.get("error")]
     # Every rate in this report is computed over completed runs only. A run that
-    # died on a rate limit or an SDK timeout is not an attack the defences
-    # stopped and not an applicant they refused; leaving it in the denominator
-    # would lower the reported ASR and raise the reported FPR for reasons that
-    # have nothing to do with the defences. The errored runs are listed below.
-    completed = [r for r in rows if not r.get("error")]
+    # died on a rate limit, an SDK timeout, or the model's output budget is not
+    # an attack the defences stopped and not an applicant they refused; leaving
+    # it in the denominator would lower the reported ASR and raise the reported
+    # FPR for reasons that have nothing to do with the defences. Those runs are
+    # listed below and counted in the header.
+    incomplete = [r for r in rows if r.get("incomplete") and not r.get("error")]
+    completed = [r for r in rows if not r.get("error") and not r.get("incomplete")]
     all_attacks = [r for r in rows if r.get("corpus", "attacks") == "attacks"]
     attacks = [r for r in completed if r.get("corpus", "attacks") == "attacks"]
     benign = [r for r in completed if r.get("corpus") == "benign"]
@@ -429,7 +431,9 @@ def build(
         f"tokens, {settings.max_turns_per_phase} turns per phase",
         f"- Repeats: attacks x{_repeats(attacks)}, benign x{_repeats(benign)}",
         f"- Runs: {len(rows)} ({len(attacks)} attack, {len(benign)} benign"
-        + (f", {len(errors)} errored and excluded from every rate" if errors else "")
+        + (f", {len(errors)} errored" if errors else "")
+        + (f", {len(incomplete)} truncated" if incomplete else "")
+        + (" - excluded from every rate" if errors or incomplete else "")
         + ")",
         "- Measured cost: " + ("unpriced" if cost is None else f"${cost:.2f}"),
         "",
@@ -511,6 +515,7 @@ def build(
         "attack_runs": len(attacks),
         "benign_runs": len(benign),
         "errored_runs_excluded": len(errors),
+        "truncated_runs_excluded": len(incomplete),
         "cost_usd": cost,
         "errors": len(errors),
     }

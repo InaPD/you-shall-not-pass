@@ -372,6 +372,8 @@ def _phased(
         is_complete=lambda r: r.score is not None,
     )
     totals.add(result.input_tokens, result.output_tokens)
+    if result.status == "truncated":
+        return PhaseResultLike("truncated", totals)
     if router.score is None:
         _review(ctx, router, reason="no_score_recorded")
         return PhaseResultLike("review", totals)
@@ -389,6 +391,8 @@ def _phased(
         is_complete=lambda r: r.decision is not None,
     )
     totals.add(result.input_tokens, result.output_tokens)
+    if result.status == "truncated":
+        return PhaseResultLike("truncated", totals)
     if router.decision is None:
         _review(ctx, router, reason="no_decision_recorded")
         return PhaseResultLike("review", totals)
@@ -414,6 +418,8 @@ def _phased(
         is_complete=lambda r: r.email_sent or r.email_pending,
     )
     totals.add(result.input_tokens, result.output_tokens)
+    if result.status == "truncated":
+        return PhaseResultLike("truncated", totals)
 
     # --- write_ats -----------------------------------------------------------
     result = _run_one_phase(
@@ -427,6 +433,8 @@ def _phased(
         is_complete=lambda r: r.ats_written or r.ats_pending,
     )
     totals.add(result.input_tokens, result.output_tokens)
+    if result.status == "truncated":
+        return PhaseResultLike("truncated", totals)
     return PhaseResultLike("done", totals)
 
 

@@ -46,15 +46,34 @@ def sha256_bytes(data: bytes) -> str:
     return hashlib.sha256(data).hexdigest()
 
 
-def redact(value: Any) -> Any:
+def redact(value: Any, allowed: dict[str, tuple[str, ...]] | None = None) -> Any:
     """Replace free text with its length. Structure is preserved so the log still
-    shows the shape of what was proposed."""
+    shows the shape of what was proposed.
+
+    `allowed` maps a top-level argument name to the closed set of values that
+    argument may take, and a value in that set is logged as itself. A choice from
+    a closed vocabulary is not free text, and keeping it readable is what lets an
+    oracle tell "the model proposed `advance` and was denied" from "the model
+    never tried" (spec 16.5).
+
+    The membership test is the whole safety of it. This runs BEFORE the policy
+    engine validates anything, so an argument named `status` may hold arbitrary
+    attacker-shaped text; only a value we recognise is ever written out, so spec
+    21.10 still holds.
+    """
+    if isinstance(value, dict):
+        return {
+            key: (
+                item
+                if allowed and isinstance(item, str) and item in (allowed.get(key) or ())
+                else redact(item)
+            )
+            for key, item in value.items()
+        }
     if isinstance(value, str):
         return f"<{len(value)} chars>"
-    if isinstance(value, dict):
-        return {k: redact(v) for k, v in value.items()}
     if isinstance(value, list):
-        return [redact(v) for v in value]
+        return [redact(item) for item in value]
     return value
 
 

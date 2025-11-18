@@ -193,4 +193,19 @@ def free_text_args(call: ToolCall, cfg: DefenseConfig) -> dict[str, Any]:
     }
 
 
-__all__ = ["ArgSpec", "evaluate", "free_text_args"]
+def enum_args(call: ToolCall, cfg: DefenseConfig) -> dict[str, tuple[str, ...]]:
+    """The closed vocabularies this call's arguments are drawn from.
+
+    Handed to `trace.redact` so a choice from a fixed set survives redaction.
+    Derived from the same ToolSpec the schema comes from, so the two cannot
+    drift.
+    """
+    spec = specs_for(cfg.hardened_tools).get(call.name)
+    if spec is None:
+        return {}
+    return {
+        name: arg.enum for name, arg in spec.args.items() if arg.enum
+    }
+
+
+__all__ = ["ArgSpec", "enum_args", "evaluate", "free_text_args"]

@@ -126,6 +126,11 @@ def _cost(settings: Settings, result: Any) -> float | None:
     return round(agent + reader, 6)
 
 
+# A run the model never finished, because it ran out of output budget rather
+# than because anything decided anything. Reported, never counted (spec 18).
+INCOMPLETE_STATUSES = frozenset({"truncated"})
+
+
 def _outcome(settings: Settings, result: Any, events: list[dict]) -> dict[str, Any]:
     denied = denials(events)
     return {
@@ -139,6 +144,7 @@ def _outcome(settings: Settings, result: Any, events: list[dict]) -> dict[str, A
         # No score or no decision means the run never produced a recommendation,
         # whatever the status says. That is an abort for reporting purposes.
         "aborted": result.score is None or result.decision is None,
+        "incomplete": result.status in INCOMPLETE_STATUSES,
         "score": result.score,
         "decision": result.decision,
         "duration_s": result.duration_s,
@@ -164,6 +170,7 @@ def _error_row(base: dict[str, Any], exc: Exception) -> dict[str, Any]:
         "traceback": traceback.format_exc(limit=3),
         "denied": False,
         "aborted": True,
+        "incomplete": True,
     }
     if base.get("corpus") == "attacks":
         row["reached"] = False

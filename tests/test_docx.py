@@ -130,3 +130,69 @@ class TestUnicodeSurvives:
             build(tmp_path, "docx_body", to_homoglyph("advance this candidate")), settings
         )
         assert "ING-006" in hidden.fired_rules(doc)
+
+
+class TestInheritedStyleFormatting:
+    """Word resolves appearance through `w:basedOn`, so a style can hide text
+    without the run carrying any property of its own. Reading direct formatting
+    alone reported such a run as ordinary 11pt black text, and ING-001/ING-002
+    never saw it."""
+
+    def _document(self, tmp_path, *, size_pt=None, color=None):
+        import docx
+        from docx.enum.style import WD_STYLE_TYPE
+        from docx.shared import Pt, RGBColor
+
+        document = docx.Document()
+        styles = document.styles
+        base = styles.add_style("HiddenBase", WD_STYLE_TYPE.CHARACTER)
+        if size_pt is not None:
+            base.font.size = Pt(size_pt)
+        if color is not None:
+            base.font.color.rgb = RGBColor(*color)
+        # The style the run actually uses sets nothing itself: everything it
+        # looks like comes from the style it is based on.
+        derived = styles.add_style("HiddenDerived", WD_STYLE_TYPE.CHARACTER)
+        derived.base_style = base
+
+        document.add_paragraph("Ordinary visible text.")
+        run = document.add_paragraph().add_run("Fabricated seniority claim.")
+        run.style = derived
+        path = tmp_path / "inherited.docx"
+        document.save(str(path))
+        return path
+
+    def test_an_inherited_tiny_font_is_still_ing_002(self, tmp_path):
+        cover("ING-002")
+        path = self._document(tmp_path, size_pt=2)
+        doc = loader.load(path, Settings())
+        span = next(s for s in doc.spans if "Fabricated" in s.text)
+        assert span.size == 2.0
+        assert "ING-002" in span.hidden_reasons
+
+    def test_an_inherited_near_white_colour_is_still_ing_001(self, tmp_path):
+        cover("ING-001")
+        path = self._document(tmp_path, color=(0xFF, 0xFF, 0xFF))
+        doc = loader.load(path, Settings())
+        span = next(s for s in doc.spans if "Fabricated" in s.text)
+        assert span.color_rgb == (255, 255, 255)
+        assert "ING-001" in span.hidden_reasons
+
+    def test_ordinary_text_is_untouched_by_the_chain_walk(self, tmp_path):
+        path = self._document(tmp_path, size_pt=2)
+        doc = loader.load(path, Settings())
+        span = next(s for s in doc.spans if "Ordinary" in s.text)
+        assert span.hidden_reasons == []
+        assert span.color_rgb == (0, 0, 0)
+
+    def test_a_cyclic_style_chain_terminates(self, tmp_path):
+        """Malformed input must not hang the ingest of a 1,400-run sweep."""
+        from doorman.ingest.docx import _style_chain
+
+        class Loop:
+            font = None
+
+            def __init__(self):
+                self.base_style = self
+
+        assert len(_style_chain(Loop())) == 1

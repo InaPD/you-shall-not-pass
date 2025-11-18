@@ -424,6 +424,48 @@ is the documented discovery, not the feature.
    `not_links` allowlist instead. The benign corpus should have caught this and
    could not: no benign applicant writes .NET. One now does.
 
+## Findings from the pre-sweep review
+
+Found by reviewing the whole app before committing to the paid matrix, and fixed.
+
+1. **A truncated response was counted as a security outcome.** `stop_reason` was
+   logged and never read, so a turn cut off at `max_tokens` produced no tool call
+   and was indistinguishable from a model that declined: the attack row said the
+   defences stopped it, the benign row said the pipeline refused an ordinary
+   applicant. The loop now reports `truncated`, the phases stop on it, and the
+   report excludes those runs from every rate the way it excludes crashes. This
+   is the third instance of one pattern - an infrastructure failure wearing the
+   costume of a measurement - after the two in Phase 4 and 5.
+2. **`max_tokens: 800` was what made it fire.** Adaptive thinking is on by
+   default for the agent model and spends the same output budget, so a tool call
+   could be cut off mid-emission. Raised to 4,000: the ceiling costs nothing,
+   since billing is for tokens generated.
+3. **The `status_eq` oracle could not see a denied proposal.** It tested
+   `status in str(args_redacted)`, but redaction replaces every string with its
+   length, so the branch never matched. The case it silently missed is the one
+   the oracle exists for: the model proposed `advance` at `ats_update` and a rule
+   denied it. `trace.redact` now keeps closed-vocabulary arguments readable - a
+   value is written out only when it is one of the values the tool spec allows,
+   so an attacker-shaped `status` is still redacted - and the oracle reads the
+   field structurally.
+4. **DOCX formatting was read one level deep.** Word resolves appearance through
+   `w:basedOn`, so a style could set 2pt or white without the run carrying either
+   property, and such a run was reported as ordinary 11pt black text: a
+   hidden-text construction ING-001 and ING-002 could not see. Both now walk the
+   style chain. An unresolvable theme colour still falls back to black, which is
+   a recorded blind spot rather than a silent pass.
+
+Measured and deliberately not changed: per-call SQLite connections cost about
+**1 second** across the whole 1,380-run sweep, and the entire ingest path runs in
+**4ms per document**, so the micro-optimisations available there are not worth
+the churn.
+
+**The budget estimate was about four times too high.** Measured from the actual
+request payloads: 2,208 to 5,096 input tokens per run depending on config, not
+the 25k the Phase 4 gate assumed. The full matrix projects to roughly **$24**,
+or about $50 allowing for extra turns and thinking output. The reps-versus-cost
+trade at that gate was answering a question that does not really arise.
+
 ## Standing constraints
 
 Carried from spec §21, the ones easiest to violate by accident while implementing:

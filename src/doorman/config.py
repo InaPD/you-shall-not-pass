@@ -111,10 +111,13 @@ class Settings:
     # this way, which is precisely why the harness runs repeats (spec 18).
     temperature: float = 0.0
 
-    # Spec 12.1 sets 800. Adaptive thinking is on by default for the agent
-    # model and consumes output tokens, so this may need raising after the
-    # first real run - a truncated response loses the tool call.
-    max_tokens: int = 800
+    # Spec 12.1 sets 800. Raised, because adaptive thinking is on by default for
+    # the agent model and spends output tokens from this same budget: at 800 a
+    # response can be cut off mid-tool-call, and a truncated turn is
+    # indistinguishable from a model that declined unless something checks
+    # `stop_reason` (the loop now does). The ceiling is not a cost: billing is
+    # for tokens generated, and a tool call is a few hundred at most.
+    max_tokens: int = 4000
 
     # Thresholds and budgets (spec 6).
     classifier_threshold: float = 0.85

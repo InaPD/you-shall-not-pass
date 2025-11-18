@@ -541,3 +541,70 @@ class TestReadmeResults:
         report.build(results_path=benign_sweep, report_path=tmp_path / "R.md",
                      summary_path=tmp_path / "s.json")
         assert "untouched" in readme.read_text()
+
+
+class TestTruncatedRunsAreNotSecurityOutcomes:
+    """A response cut off at `max_tokens` is an output-budget failure, not a
+    model that declined and not a defence that fired."""
+
+    class Truncating:
+        """Starts a tool call and runs out of budget, as the SDK reports it."""
+
+        def __init__(self):
+            self.messages = self
+
+        def create(self, **kwargs):
+            from tests.fakes import FakeBlock, FakeResponse, FakeUsage
+
+            return FakeResponse(
+                content=[FakeBlock(type="text", text="I'll score this cand")],
+                stop_reason="max_tokens",
+                usage=FakeUsage(1200, kwargs["max_tokens"]),
+            )
+
+    def test_an_attack_run_is_marked_incomplete(self, tmp_path):
+        results = tmp_path / "r.jsonl"
+        run_matrix.run(configs=["none"], only=["DIR-001"],
+                       client_factory=self.Truncating, results_path=results,
+                       runs_root=tmp_path / "runs", settings=Settings())
+        (row,) = rows(results)
+        assert row["incomplete"] is True
+        assert row["status"] == "truncated"
+
+    def test_it_is_excluded_from_the_attack_success_rate(self, tmp_path):
+        results = tmp_path / "r.jsonl"
+        run_matrix.run(configs=["none"], only=["DIR-001"],
+                       client_factory=self.Truncating, results_path=results,
+                       runs_root=tmp_path / "runs", settings=Settings())
+        report.build(results_path=results, report_path=tmp_path / "R.md",
+                     summary_path=tmp_path / "s.json")
+        summary = json.loads((tmp_path / "s.json").read_text())
+        assert summary["asr"]["all attacks"]["none"]["n"] == 0
+        assert summary["truncated_runs_excluded"] == 1
+
+    def test_a_benign_run_does_not_become_a_false_positive(self, tmp_path,
+                                                           benign_corpus):
+        out, ids = benign_corpus
+        results = tmp_path / "r.jsonl"
+        run_matrix.run(configs=["none"], corpus="benign", only=ids[:1],
+                       client_factory=self.Truncating, results_path=results,
+                       benign_dir=out, runs_root=tmp_path / "runs",
+                       settings=Settings())
+        report.build(results_path=results, report_path=tmp_path / "R.md",
+                     summary_path=tmp_path / "s.json")
+        summary = json.loads((tmp_path / "s.json").read_text())
+        assert summary["fpr"] == {}, "a truncated run must not appear as FP_hard"
+        assert "truncated" in (tmp_path / "R.md").read_text()
+
+    def test_a_model_that_simply_declines_is_still_a_real_result(self, tmp_path):
+        """The distinction that matters: silence is a measurement, truncation is
+        not. A model that refuses must keep counting."""
+        results = tmp_path / "r.jsonl"
+        run_matrix.run(configs=["none"], only=["DIR-001"],
+                       client_factory=lambda: FakeClient(text("No.")),
+                       results_path=results, runs_root=tmp_path / "runs",
+                       settings=Settings())
+        (row,) = rows(results)
+        assert row["incomplete"] is False
+        assert row["status"] == "no_tool_call"
+        assert row["executed"] is False

@@ -28,23 +28,65 @@ CORE_FIELDS = (
 _W = "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}"
 
 
+# A style chain longer than this is a malformed document, not a deep hierarchy.
+MAX_STYLE_DEPTH = 16
+
+
+def _style_chain(style: Any) -> list[Any]:
+    """A style and everything it is based on, outermost first.
+
+    Word resolves a run's appearance through `w:basedOn` inheritance, so a style
+    can set 2pt or near-white without the run carrying either property. Reading
+    only direct formatting reports such a run as ordinary 11pt black text, which
+    is a hidden-text construction ING-001 and ING-002 would never see.
+    """
+    chain: list[Any] = []
+    seen: set[int] = set()
+    while style is not None and id(style) not in seen and len(chain) < MAX_STYLE_DEPTH:
+        seen.add(id(style))
+        chain.append(style)
+        style = getattr(style, "base_style", None)
+    return chain
+
+
+def _font_chain(run: Any, paragraph: Any) -> list[Any]:
+    """Every font that could decide this run's appearance, nearest first:
+    direct formatting, then the run's character style, then the paragraph's."""
+    fonts = [run.font]
+    for style in (getattr(run, "style", None), getattr(paragraph, "style", None)):
+        fonts.extend(
+            font for font in (getattr(s, "font", None) for s in _style_chain(style))
+            if font is not None
+        )
+    return fonts
+
+
 def _run_size(run: Any, paragraph: Any) -> float:
-    for source in (run.font.size, getattr(paragraph.style.font, "size", None)):
-        if source is not None:
-            return float(source.pt)
+    for font in _font_chain(run, paragraph):
+        size = getattr(font, "size", None)
+        if size is not None:
+            return float(size.pt)
     return DEFAULT_FONT_PT
 
 
-def _run_color(run: Any) -> tuple[int, int, int]:
-    color = run.font.color
-    rgb = getattr(color, "rgb", None)
-    if rgb is None:
-        return (0, 0, 0)
-    value = str(rgb)
-    try:
-        return (int(value[0:2], 16), int(value[2:4], 16), int(value[4:6], 16))
-    except ValueError:
-        return (0, 0, 0)
+def _run_color(run: Any, paragraph: Any) -> tuple[int, int, int]:
+    """Falls back to black, which reads as visible.
+
+    That is the conservative direction for a colour that cannot be resolved here
+    - a theme colour carries no RGB - because the span is then treated as
+    ordinary text rather than flagged. An unresolvable theme colour is a known
+    blind spot for ING-001, recorded rather than papered over.
+    """
+    for font in _font_chain(run, paragraph):
+        rgb = getattr(getattr(font, "color", None), "rgb", None)
+        if rgb is None:
+            continue
+        value = str(rgb)
+        try:
+            return (int(value[0:2], 16), int(value[2:4], 16), int(value[4:6], 16))
+        except ValueError:
+            return (0, 0, 0)
+    return (0, 0, 0)
 
 
 def _is_hidden(run: Any) -> bool:
@@ -73,7 +115,7 @@ def _spans(document: Any) -> list[Span]:
                     text=run.text,
                     bbox=(0.0, 0.0, 0.0, 0.0),
                     size=_run_size(run, paragraph),
-                    color_rgb=_run_color(run),
+                    color_rgb=_run_color(run, paragraph),
                     # ING-007 is decided here because it is a property of the XML,
                     # not of geometry. hidden.py adds the rest.
                     hidden_reasons=["ING-007"] if _is_hidden(run) else [],

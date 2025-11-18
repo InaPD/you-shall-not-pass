@@ -27,7 +27,7 @@ from doorman.models import (
     Taint,
     ToolCall,
 )
-from doorman.policy.engine import free_text_args
+from doorman.policy.engine import enum_args, free_text_args
 from doorman.tools import effects, web
 from doorman.tools.ats import ATS
 from doorman.tools.email import Outbox
@@ -35,7 +35,7 @@ from doorman.tools.email import Outbox
 
 @dataclass
 class PhaseResult:
-    status: str  # done | no_tool_call | max_turns
+    status: str  # done | no_tool_call | max_turns | truncated
     input_tokens: int = 0
     output_tokens: int = 0
     turns: int = 0
@@ -300,7 +300,15 @@ def run_phase(
         messages.append({"role": "assistant", "content": response.content})
         tool_uses = [block for block in response.content if block.type == "tool_use"]
         if not tool_uses:
-            result.status = "no_tool_call"
+            # A response cut off at max_tokens is not a model that declined. The
+            # two look identical from here - no tool call either way - and
+            # conflating them turns an output-budget failure into "the attack
+            # did not land" or "the applicant was refused". The harness drops
+            # truncated runs rather than counting them (spec 18).
+            if getattr(response, "stop_reason", None) == "max_tokens":
+                result.status = "truncated"
+            else:
+                result.status = "no_tool_call"
             return result
 
         results = []
@@ -310,7 +318,7 @@ def run_phase(
                 ctx,
                 tool=call.name,
                 args_sha256=trace.sha256_text(json.dumps(call.input, sort_keys=True, default=str)),
-                args_redacted=trace.redact(call.input),
+                args_redacted=trace.redact(call.input, enum_args(call, cfg)),
             )
             decision = evaluate(call, ctx, cfg) if evaluate else Allow()
             trace.policy_decision(
