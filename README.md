@@ -3,7 +3,7 @@
 A recruiting agent that reads resumes, scores them, emails candidates and updates
 an applicant tracking system (ATS), with layered defences against prompt injection
 hidden in the resume. It is a measurement rig: email, ATS and web access are mocks,
-and the harness measures how many attacks get through each defence configuration.
+and the harness measures how many attacks successfully get through each defence configuration.
 
 ## Architecture
 
